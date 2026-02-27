@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform Architecture – Sapiant</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+  :root {
+    --bg:#0a0e1a;--surface:#111827;--surface2:#1a2235;--border:#1e2d45;--border-bright:#2a3f5e;
+    --accent:#00c4ff;--accent2:#7c3aed;--accent3:#10b981;--accent4:#f59e0b;--accent5:#ef4444;
+    --text:#e2e8f0;--text-muted:#64748b;--text-dim:#94a3b8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,196,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,196,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .container{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:40px 32px;}
+  header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid var(--border);}
+  .header-left h1{font-size:13px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);font-family:'IBM Plex Mono',monospace;margin-bottom:10px;}
+  .header-left h2{font-size:32px;font-weight:700;line-height:1.1;}
+  .header-left h2 span{color:var(--accent);}
+  .header-left p{margin-top:10px;color:var(--text-dim);font-size:15px;max-width:480px;line-height:1.6;}
+  .header-meta{text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-muted);line-height:2;}
+  .tabs{display:flex;gap:4px;margin-bottom:32px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:fit-content;flex-wrap:wrap;}
+  .tab{padding:8px 16px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;color:var(--text-muted);border:none;background:transparent;font-family:'IBM Plex Sans',sans-serif;}
+  .tab:hover{color:var(--text);background:var(--surface2);}
+  .tab.active{background:var(--accent);color:#0a0e1a;font-weight:600;}
+  .panel{display:none;animation:fadeIn 0.3s ease;}
+  .panel.active{display:block;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  /* ARCH */
+  .arch-diagram{display:grid;gap:16px;}
+  .tier{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px;transition:border-color 0.2s;}
+  .tier:hover{border-color:var(--border-bright);}
+  .tier-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+  .tier-label::after{content:'';flex:1;height:1px;background:var(--border);}
+  .tier-label.client{color:var(--accent);}.tier-label.identity{color:var(--accent2);}.tier-label.gateway{color:var(--accent4);}.tier-label.backend{color:var(--accent3);}.tier-label.data{color:#f472b6;}.tier-label.powerbi{color:var(--accent);}
+  .tier-row{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;}
+  .box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;flex:1;min-width:160px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;}
+  .box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;transition:opacity 0.2s;opacity:0;}
+  .box:hover{border-color:var(--border-bright);transform:translateY(-1px);}
+  .box:hover::before{opacity:1;}
+  .box.accent-blue::before{background:var(--accent);}.box.accent-purple::before{background:var(--accent2);}.box.accent-green::before{background:var(--accent3);}.box.accent-amber::before{background:var(--accent4);}.box.accent-pink::before{background:#f472b6;}
+  .box:hover.accent-blue{border-color:var(--accent);}.box:hover.accent-purple{border-color:var(--accent2);}.box:hover.accent-green{border-color:var(--accent3);}.box:hover.accent-amber{border-color:var(--accent4);}
+  .box-icon{font-size:20px;margin-bottom:8px;}.box-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;}.box-sub{font-size:11px;color:var(--text-muted);line-height:1.4;}
+  .flow-arrows{display:flex;justify-content:center;align-items:center;padding:4px 0;gap:32px;color:var(--text-muted);font-size:11px;font-family:'IBM Plex Mono',monospace;}
+  .arrow-item{display:flex;align-items:center;gap:6px;flex-direction:column;}
+  .arrow-line{width:1px;height:24px;background:linear-gradient(to bottom,var(--border),transparent);position:relative;}
+  .arrow-line::after{content:'▼';position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--border-bright);}
+  .legend{display:flex;gap:20px;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;}
+  .legend-dot{width:8px;height:8px;border-radius:2px;}
+  .hint{display:inline-block;font-size:11px;color:var(--text-muted);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:'IBM Plex Mono',monospace;margin-bottom:16px;}
+  /* DETAIL */
+  .detail-panel{position:fixed;right:0;top:0;bottom:0;width:380px;background:var(--surface);border-left:1px solid var(--border);padding:32px 28px;transform:translateX(100%);transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);z-index:100;overflow-y:auto;}
+  .detail-panel.open{transform:translateX(0);}
+  .detail-close{position:absolute;top:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-family:'IBM Plex Mono',monospace;transition:all 0.2s;}
+  .detail-close:hover{border-color:var(--accent5);color:var(--accent5);}
+  .detail-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
+  .detail-title{font-size:20px;font-weight:700;margin-bottom:16px;}
+  .detail-desc{font-size:14px;color:var(--text-dim);line-height:1.7;margin-bottom:20px;}
+  .detail-section{margin-bottom:20px;}
+  .detail-section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:10px;font-family:'IBM Plex Mono',monospace;}
+  .detail-item{display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;}
+  .detail-item-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:6px;flex-shrink:0;}
+  .detail-item-text{font-size:13px;color:var(--text-dim);line-height:1.5;}
+  .detail-tech{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .tech-badge{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:3px 10px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);}
+  .tech-badge.primary{border-color:var(--accent);color:var(--accent);background:rgba(0,196,255,0.06);}
+  .tech-badge.purple{border-color:var(--accent2);color:var(--accent2);background:rgba(124,58,237,0.06);}
+  .tech-badge.green{border-color:var(--accent3);color:var(--accent3);background:rgba(16,185,129,0.06);}
+  .tech-badge.amber{border-color:var(--accent4);color:var(--accent4);background:rgba(245,158,11,0.06);}
+  .backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99;}
+  .backdrop.open{display:block;}
+  /* RLS */
+  .rls-flow{display:grid;gap:0;margin-bottom:24px;}
+  .rls-step{display:grid;grid-template-columns:40px 1fr;gap:16px;align-items:flex-start;padding:16px 8px;border-bottom:1px solid var(--border);transition:background 0.2s;border-radius:6px;}
+  .rls-step:hover{background:var(--surface2);}
+  .rls-step:last-child{border-bottom:none;}
+  .rls-num{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;flex-shrink:0;}
+  .rls-step-content h4{font-size:13px;font-weight:600;margin-bottom:4px;}
+  .rls-step-content p{font-size:12px;color:var(--text-muted);line-height:1.5;}
+  .rls-step-content code{font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--surface2);border:1px solid var(--border);padding:2px 6px;border-radius:3px;color:var(--accent3);display:inline-block;margin-top:4px;}
+  /* TRADEOFFS */
+  .tradeoff-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .tradeoff-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;}
+  .tradeoff-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .tradeoff-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+  .tradeoff-title{font-size:14px;font-weight:600;}.tradeoff-subtitle{font-size:11px;color:var(--text-muted);}
+  .tradeoff-body{font-size:13px;color:var(--text-dim);line-height:1.6;}
+  .pro-con{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;}
+  .pro,.con{background:var(--surface2);border-radius:6px;padding:10px 12px;}
+  .pro{border-top:2px solid var(--accent3);}.con{border-top:2px solid var(--accent5);}
+  .pro-title,.con-title{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;}
+  .pro-title{color:var(--accent3);}.con-title{color:var(--accent5);}
+  .pro li,.con li{font-size:11px;color:var(--text-muted);margin-bottom:3px;list-style:none;padding-left:12px;position:relative;line-height:1.4;}
+  .pro li::before{content:'+';position:absolute;left:0;color:var(--accent3);}
+  .con li::before{content:'−';position:absolute;left:0;color:var(--accent5);}
+  /* SCALABILITY */
+  .scale-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .scale-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;}
+  .scale-header{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;font-family:'IBM Plex Mono',monospace;display:flex;gap:8px;align-items:center;}
+  .scale-dot{width:8px;height:8px;border-radius:50%;}
+  .scale-item{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+  .scale-item:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+  .scale-item-title{font-size:13px;font-weight:600;margin-bottom:4px;}
+  .scale-item-desc{font-size:12px;color:var(--text-muted);line-height:1.5;}
+
+  /* ═══ INFRA ═══ */
+  #panel-infra{overflow-x:auto;}
+  .infra-canvas{min-width:860px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:32px;}
+  .infra-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);margin-bottom:28px;display:flex;align-items:center;gap:10px;}
+  .infra-title::after{content:'';flex:1;height:1px;background:var(--border);}
+  .cloud-zone{border:1px dashed;border-radius:12px;padding:20px;margin-bottom:16px;position:relative;}
+  .cloud-zone.aws{border-color:rgba(245,158,11,0.35);background:rgba(245,158,11,0.025);}
+  .cloud-zone.azure-ext{border-color:rgba(96,165,250,0.35);background:rgba(96,165,250,0.02);}
+  .cloud-zone.saas-ext{border-color:rgba(124,58,237,0.35);background:rgba(124,58,237,0.02);}
+  .cloud-zone.users-zone{border-color:rgba(0,196,255,0.25);background:rgba(0,196,255,0.015);}
+  .zone-label{position:absolute;top:-11px;left:20px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;padding:0 8px;background:var(--surface);}
+  .zone-label.aws{color:var(--accent4);}.zone-label.azure-ext{color:#60a5fa;}.zone-label.saas-ext{color:var(--accent2);}.zone-label.users-zone{color:var(--accent);}
+  .infra-row{display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;margin-bottom:12px;}
+  .infra-row:last-child{margin-bottom:0;}
+  .inode{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;flex:1;min-width:130px;transition:all 0.2s;}
+  .inode:hover{border-color:var(--border-bright);transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,0.3);}
+  .inode-icon{font-size:17px;margin-bottom:5px;}
+  .inode-name{font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;}
+  .inode-detail{font-size:10px;color:var(--text-muted);line-height:1.4;}
+  .inode-badge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:9px;padding:1px 6px;border-radius:3px;margin-top:5px;}
+  .inode-badge.managed{background:rgba(16,185,129,0.12);color:var(--accent3);border:1px solid rgba(16,185,129,0.3);}
+  .inode-badge.ha{background:rgba(0,196,255,0.1);color:var(--accent);border:1px solid rgba(0,196,255,0.3);}
+  .inode-badge.ext-badge{background:rgba(124,58,237,0.1);color:var(--accent2);border:1px solid rgba(124,58,237,0.3);}
+  .infra-section-label{font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;margin-top:4px;}
+  .connector-row{display:flex;justify-content:center;align-items:center;padding:4px 0;gap:48px;}
+  .connector{display:flex;flex-direction:column;align-items:center;gap:2px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-muted);}
+  .connector-line{width:1px;height:26px;position:relative;}
+  .connector-line::after{content:'▼';position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);font-size:8px;}
+  .connector-line.blue{background:linear-gradient(to bottom,rgba(0,196,255,0.5),transparent);}.connector-line.blue::after{color:var(--accent);}
+  .connector-line.purple{background:linear-gradient(to bottom,rgba(124,58,237,0.5),transparent);}.connector-line.purple::after{color:var(--accent2);}
+  .connector-line.green{background:linear-gradient(to bottom,rgba(16,185,129,0.5),transparent);}.connector-line.green::after{color:var(--accent3);}
+  .connector-line.amber{background:linear-gradient(to bottom,rgba(245,158,11,0.5),transparent);}.connector-line.amber::after{color:var(--accent4);}
+  .az-container{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;}
+  .az-zone{border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:12px;background:rgba(255,255,255,0.012);}
+  .az-label{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;}
+  .az-items{display:flex;flex-direction:column;gap:7px;}
+  .az-item{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 11px;font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:8px;}
+  .az-item-icon{font-size:14px;}
+
+  /* ═══ COST CALCULATOR ═══ */
+  .cost-layout{display:grid;grid-template-columns:290px 1fr;gap:24px;align-items:start;}
+  .cost-controls{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;position:sticky;top:20px;}
+  .cost-controls-title{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--accent);margin-bottom:20px;}
+  .control-group{margin-bottom:16px;}
+  .control-label{font-size:12px;font-weight:600;color:var(--text-dim);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
+  .control-value{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent);background:rgba(0,196,255,0.08);border:1px solid rgba(0,196,255,0.2);border-radius:4px;padding:1px 7px;}
+  input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--border);outline:none;margin-top:4px;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 8px rgba(0,196,255,0.4);}
+  .control-options{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+  .opt-btn{padding:4px 10px;border-radius:5px;font-size:11px;font-family:'IBM Plex Mono',monospace;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all 0.15s;}
+  .opt-btn:hover{border-color:var(--border-bright);color:var(--text);}
+  .opt-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,196,255,0.08);}
+  .cost-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+  .cost-stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;text-align:center;}
+  .cost-stat-label{font-size:10px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.08em;font-family:'IBM Plex Mono',monospace;}
+  .cost-stat-value{font-size:26px;font-weight:700;color:var(--text);font-family:'IBM Plex Mono',monospace;}
+  .cost-stat-sub{font-size:10px;color:var(--text-muted);margin-top:3px;}
+  .cost-stat.highlight{border-color:var(--accent3);}.cost-stat.highlight .cost-stat-value{color:var(--accent3);}
+  .cost-stat.warn{border-color:var(--accent4);}.cost-stat.warn .cost-stat-value{color:var(--accent4);}
+  .cost-breakdown{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .breakdown-header{display:grid;grid-template-columns:1fr 90px 90px 100px 28px;gap:8px;padding:11px 18px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;}
+  .breakdown-row{display:grid;grid-template-columns:1fr 90px 90px 100px 28px;gap:8px;padding:11px 18px;border-bottom:1px solid var(--border);align-items:center;transition:background 0.15s;}
+  .breakdown-row:last-child{border-bottom:none;}
+  .breakdown-row:hover{background:var(--surface2);}
+  .br-service{display:flex;align-items:center;gap:9px;}
+  .br-icon{font-size:16px;}.br-name{font-size:13px;font-weight:500;}.br-desc{font-size:10px;color:var(--text-muted);}
+  .br-tier{font-size:11px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;}
+  .br-launch{font-size:13px;font-weight:600;font-family:'IBM Plex Mono',monospace;}
+  .br-scale{font-size:13px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--accent4);}
+  .br-bar-inner{height:4px;border-radius:2px;background:var(--accent);transition:width 0.4s ease;}
+  .cost-footer{display:grid;grid-template-columns:1fr 90px 90px 100px 28px;gap:8px;padding:13px 18px;background:var(--surface2);border-top:2px solid var(--border);font-weight:700;font-family:'IBM Plex Mono',monospace;}
+  .cf-label{font-size:13px;color:var(--text);}
+  .cf-launch{font-size:14px;color:var(--accent3);}
+  .cf-scale{font-size:14px;color:var(--accent4);}
+  .cost-notes{margin-top:18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;}
+  .cost-notes-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;font-family:'IBM Plex Mono',monospace;}
+  .cost-note{display:flex;gap:10px;margin-bottom:8px;}
+  .cost-note-dot{width:6px;height:6px;border-radius:50%;margin-top:6px;flex-shrink:0;}
+  .cost-note-text{font-size:12px;color:var(--text-dim);line-height:1.5;}
+  @media(max-width:900px){.cost-layout{grid-template-columns:1fr;}.cost-controls{position:static;}.tradeoff-grid{grid-template-columns:1fr;}.scale-grid{grid-template-columns:1fr;}.cost-summary{grid-template-columns:1fr;}.az-container{grid-template-columns:1fr;}.breakdown-header,.breakdown-row,.cost-footer{grid-template-columns:1fr 70px 70px 80px;}.breakdown-header>:last-child,.breakdown-row>:last-child,.cost-footer>:last-child{display:none;}}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-left">
+      <h1>Architecture Design</h1>
+      <h2>Reporting Hub <span>Replacement</span></h2>
+      <p>Custom multi-tenant SaaS platform — full control over security, UI/UX, and embedded Power BI with RLS.</p>
+    </div>
+    <div class="header-meta">
+      <div>Prepared for Sapiant</div>
+      <div>Feb 2026</div>
+      <div style="margin-top:8px;color:var(--accent);font-weight:600;">Click boxes for details →</div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showPanel('architecture',this)">Architecture</button>
+    <button class="tab" onclick="showPanel('infra',this)">Infrastructure</button>
+    <button class="tab" onclick="showPanel('cost',this)">Cost Calculator</button>
+    <button class="tab" onclick="showPanel('rls',this)">Power BI RLS</button>
+    <button class="tab" onclick="showPanel('tradeoffs',this)">Trade-offs</button>
+    <button class="tab" onclick="showPanel('scalability',this)">Scalability</button>
+  </div>
+
+  <!-- ══ ARCHITECTURE ══ -->
+  <div class="panel active" id="panel-architecture">
+    <span class="hint">Click any component for details</span>
+    <div class="arch-diagram">
+      <div class="tier"><div class="tier-label client">Client Tier</div><div class="tier-row">
+        <div class="box accent-blue" onclick="showDetail('nextjs')"><div class="box-icon">⚛️</div><div class="box-title">Next.js Frontend</div><div class="box-sub">React 18 · App Router · SSR/SSG · TypeScript</div></div>
+        <div class="box accent-blue" onclick="showDetail('pbi-embed')"><div class="box-icon">📊</div><div class="box-title">Power BI Embed SDK</div><div class="box-sub">powerbi-client-react · RLS via embed token</div></div>
+        <div class="box accent-blue" onclick="showDetail('ui')"><div class="box-icon">🎨</div><div class="box-title">Design System</div><div class="box-sub">Tailwind CSS · shadcn/ui · Radix · Framer Motion</div></div>
+      </div></div>
+      <div class="flow-arrows"><div class="arrow-item"><div class="arrow-line"></div><span>HTTPS / REST</span></div><div class="arrow-item"><div class="arrow-line"></div><span>JWT tokens</span></div><div class="arrow-item"><div class="arrow-line"></div><span>WebSocket / SSE</span></div></div>
+      <div class="tier"><div class="tier-label identity">Identity & Auth</div><div class="tier-row">
+        <div class="box accent-purple" onclick="showDetail('auth0')"><div class="box-icon">🔐</div><div class="box-title">Auth0 / Azure AD B2C</div><div class="box-sub">OIDC · OAuth 2.0 · MFA · SSO · Social login</div></div>
+        <div class="box accent-purple" onclick="showDetail('rbac')"><div class="box-icon">🧩</div><div class="box-title">RBAC + Tenant Context</div><div class="box-sub">Roles · Permissions · Tenant isolation in JWT</div></div>
+        <div class="box accent-purple" onclick="showDetail('session')"><div class="box-icon">🪪</div><div class="box-title">Session Management</div><div class="box-sub">Refresh tokens · Short-lived JWTs · Secure cookies</div></div>
+      </div></div>
+      <div class="flow-arrows"><div class="arrow-item"><div class="arrow-line"></div><span>Authenticated requests</span></div></div>
+      <div class="tier"><div class="tier-label gateway">API Gateway</div><div class="tier-row">
+        <div class="box accent-amber" onclick="showDetail('gateway')"><div class="box-icon">🚦</div><div class="box-title">API Gateway / BFF</div><div class="box-sub">Rate limiting · Token validation · Request routing</div></div>
+        <div class="box accent-amber" onclick="showDetail('middleware')"><div class="box-icon">🛡️</div><div class="box-title">Middleware Layer</div><div class="box-sub">Tenant resolution · Audit logging · CORS</div></div>
+      </div></div>
+      <div class="flow-arrows"><div class="arrow-item"><div class="arrow-line"></div><span>Internal service calls</span></div></div>
+      <div class="tier"><div class="tier-label backend">Backend Services</div><div class="tier-row">
+        <div class="box accent-green" onclick="showDetail('api')"><div class="box-icon">⚙️</div><div class="box-title">Core API</div><div class="box-sub">Node.js · Fastify · REST · Business logic</div></div>
+        <div class="box accent-green" onclick="showDetail('embed-service')"><div class="box-icon">🔑</div><div class="box-title">Embed Token Service</div><div class="box-sub">Generates PBI embed tokens · Injects RLS identity</div></div>
+        <div class="box accent-green" onclick="showDetail('tenant-service')"><div class="box-icon">🏢</div><div class="box-title">Tenant Service</div><div class="box-sub">Config · Feature flags · Nav menus · Branding</div></div>
+        <div class="box accent-green" onclick="showDetail('ai-service')"><div class="box-icon">🤖</div><div class="box-title">AI / Analytics Service</div><div class="box-sub">NL queries · Insights · OpenAI/Anthropic</div></div>
+      </div></div>
+      <div class="flow-arrows"><div class="arrow-item"><div class="arrow-line"></div><span>DB queries</span></div><div class="arrow-item"><div class="arrow-line"></div><span>PBI REST API</span></div><div class="arrow-item"><div class="arrow-line"></div><span>Cache reads</span></div></div>
+      <div class="tier"><div class="tier-label data">Data & Storage</div><div class="tier-row">
+        <div class="box accent-pink" onclick="showDetail('postgres')"><div class="box-icon">🐘</div><div class="box-title">PostgreSQL</div><div class="box-sub">Tenants · Users · Roles · Config · Audit logs</div></div>
+        <div class="box accent-pink" onclick="showDetail('redis')"><div class="box-icon">⚡</div><div class="box-title">Redis</div><div class="box-sub">Embed token cache · Sessions · Rate limits</div></div>
+        <div class="box accent-pink" onclick="showDetail('blob')"><div class="box-icon">🗄️</div><div class="box-title">Blob Storage</div><div class="box-sub">Logos · Exports · Report assets · S3</div></div>
+        <div class="box accent-pink" onclick="showDetail('observability')"><div class="box-icon">📡</div><div class="box-title">Observability</div><div class="box-sub">DataDog / OpenTelemetry · Logs · Traces</div></div>
+      </div></div>
+      <div class="flow-arrows"><div class="arrow-item"><div class="arrow-line"></div><span>Embed token (with RLS claims)</span></div></div>
+      <div class="tier"><div class="tier-label powerbi">Power BI Service (Microsoft)</div><div class="tier-row">
+        <div class="box accent-blue" onclick="showDetail('pbi-service')"><div class="box-icon">📈</div><div class="box-title">Power BI Embedded</div><div class="box-sub">A-SKU capacity · Reports · RLS enforcement</div></div>
+        <div class="box accent-blue" onclick="showDetail('pbi-api')"><div class="box-icon">🔌</div><div class="box-title">Power BI REST API</div><div class="box-sub">Token generation · Dataset refresh</div></div>
+        <div class="box accent-blue" onclick="showDetail('pbi-rls')"><div class="box-icon">🛡️</div><div class="box-title">Row-Level Security</div><div class="box-sub">RLS roles · DAX filters · Username claims</div></div>
+      </div></div>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>Client / PBI</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent2)"></div>Identity</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent4)"></div>Gateway</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent3)"></div>Backend</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f472b6"></div>Data</div>
+    </div>
+  </div>
+
+  <!-- ══ INFRASTRUCTURE ══ -->
+  <div class="panel" id="panel-infra">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:20px;line-height:1.6;">How the logical architecture maps to real AWS cloud resources, with Power BI hosted on Azure and Auth0 as an external SaaS. Designed for high availability with multi-AZ deployments on all stateful components.</p>
+    <div class="infra-canvas">
+      <div class="infra-title">Infrastructure Diagram — AWS ap-southeast-2 + External Services</div>
+
+      <!-- Users -->
+      <div class="cloud-zone users-zone">
+        <div class="zone-label users-zone">Users & Clients</div>
+        <div class="infra-row">
+          <div class="inode"><div class="inode-icon">👤</div><div class="inode-name">Internal Users</div><div class="inode-detail">Sapiant staff · Admin console · Full feature set</div></div>
+          <div class="inode"><div class="inode-icon">🏢</div><div class="inode-name">External Customers</div><div class="inode-detail">Tenant users · Data scoped by RLS</div></div>
+          <div class="inode"><div class="inode-icon">🌐</div><div class="inode-name">Browser / Mobile</div><div class="inode-detail">HTTPS only · No installed client required</div></div>
+        </div>
+      </div>
+
+      <div class="connector-row">
+        <div class="connector"><div class="connector-line blue"></div><span>HTTPS / TLS 1.3</span></div>
+        <div class="connector"><div class="connector-line blue"></div><span>CloudFront Edge</span></div>
+      </div>
+
+      <!-- AWS Zone -->
+      <div class="cloud-zone aws">
+        <div class="zone-label aws">☁ AWS — ap-southeast-2 (Sydney)</div>
+
+        <div class="infra-section-label">Edge & Security</div>
+        <div class="infra-row" style="margin-bottom:18px;">
+          <div class="inode"><div class="inode-icon">🌐</div><div class="inode-name">CloudFront CDN</div><div class="inode-detail">Global PoPs · Static assets · Cache headers · HTTPS enforcement</div><div><span class="inode-badge managed">Managed</span></div></div>
+          <div class="inode"><div class="inode-icon">🛡️</div><div class="inode-name">AWS WAF</div><div class="inode-detail">Rate limiting · IP blocking · OWASP Top 10 rules · Bot protection</div><div><span class="inode-badge managed">Managed</span></div></div>
+          <div class="inode"><div class="inode-icon">⚖️</div><div class="inode-name">Application Load Balancer</div><div class="inode-detail">Multi-AZ · SSL termination · Health checks · Path-based routing</div><div><span class="inode-badge ha">Multi-AZ</span></div></div>
+          <div class="inode"><div class="inode-icon">🌐</div><div class="inode-name">Route 53</div><div class="inode-detail">DNS routing · Health-check failover · Per-tenant subdomains (*.app.com)</div><div><span class="inode-badge managed">Managed</span></div></div>
+        </div>
+
+        <div class="infra-section-label">Compute — ECS Fargate (Multi-AZ, Auto-Scaling)</div>
+        <div class="az-container" style="margin-bottom:18px;">
+          <div class="az-zone">
+            <div class="az-label">Availability Zone A</div>
+            <div class="az-items">
+              <div class="az-item"><div class="az-item-icon">🐳</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Next.js App (2–10 tasks)</div><div style="font-size:10px;color:var(--text-muted)">0.5 vCPU / 1 GB · SSR + API routes</div></div></div>
+              <div class="az-item"><div class="az-item-icon">🐳</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Core API Service (2–8 tasks)</div><div style="font-size:10px;color:var(--text-muted)">0.5 vCPU / 1 GB · Fastify REST API</div></div></div>
+              <div class="az-item"><div class="az-item-icon">🔑</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Embed Token Service (2–4 tasks)</div><div style="font-size:10px;color:var(--text-muted)">0.25 vCPU / 512 MB · PBI token gen</div></div></div>
+            </div>
+          </div>
+          <div class="az-zone">
+            <div class="az-label">Availability Zone B</div>
+            <div class="az-items">
+              <div class="az-item"><div class="az-item-icon">🐳</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Next.js App (mirror)</div><div style="font-size:10px;color:var(--text-muted)">Auto-scaled replica of AZ-A</div></div></div>
+              <div class="az-item"><div class="az-item-icon">🐳</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Core API Service (mirror)</div><div style="font-size:10px;color:var(--text-muted)">Auto-scaled replica of AZ-A</div></div></div>
+              <div class="az-item"><div class="az-item-icon">🔑</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Embed Token Service (mirror)</div><div style="font-size:10px;color:var(--text-muted)">Auto-scaled replica of AZ-A</div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="infra-section-label">Data Layer</div>
+        <div class="infra-row" style="margin-bottom:18px;">
+          <div class="inode"><div class="inode-icon">🐘</div><div class="inode-name">RDS PostgreSQL</div><div class="inode-detail">db.t4g.medium · Multi-AZ standby · Read replica · Auto-backups 7d</div><div><span class="inode-badge ha">Multi-AZ</span></div></div>
+          <div class="inode"><div class="inode-icon">⚡</div><div class="inode-name">ElastiCache Redis</div><div class="inode-detail">cache.t4g.micro · Cluster mode · 2 replicas · Embed token + session cache</div><div><span class="inode-badge ha">Clustered</span></div></div>
+          <div class="inode"><div class="inode-icon">🗄️</div><div class="inode-name">S3 Buckets</div><div class="inode-detail">Tenant assets · Report exports · Versioning · SSE-S3 encryption</div><div><span class="inode-badge managed">Managed</span></div></div>
+          <div class="inode"><div class="inode-icon">🔒</div><div class="inode-name">Secrets Manager</div><div class="inode-detail">DB creds · PBI service principal · API keys · Auto-rotation enabled</div><div><span class="inode-badge managed">Managed</span></div></div>
+        </div>
+
+        <div class="infra-section-label">CI/CD & Observability</div>
+        <div class="infra-row">
+          <div class="inode"><div class="inode-icon">📦</div><div class="inode-name">ECR (Container Registry)</div><div class="inode-detail">Docker images · Vulnerability scanning · Immutable tags</div><div><span class="inode-badge managed">Managed</span></div></div>
+          <div class="inode"><div class="inode-icon">🚀</div><div class="inode-name">CodePipeline + CodeBuild</div><div class="inode-detail">CI/CD pipeline · Blue-green ECS deploys · Automated rollback</div><div><span class="inode-badge managed">Managed</span></div></div>
+          <div class="inode"><div class="inode-icon">📡</div><div class="inode-name">CloudWatch</div><div class="inode-detail">Container insights · Log groups · Custom metrics · Alarms → SNS</div><div><span class="inode-badge managed">Managed</span></div></div>
+        </div>
+      </div>
+
+      <div class="connector-row">
+        <div class="connector"><div class="connector-line purple"></div><span>OIDC login flow</span></div>
+        <div class="connector"><div class="connector-line blue"></div><span>PBI REST API (HTTPS)</span></div>
+        <div class="connector"><div class="connector-line green"></div><span>Email / AI APIs</span></div>
+      </div>
+
+      <!-- External SaaS -->
+      <div class="cloud-zone saas-ext">
+        <div class="zone-label saas-ext">External SaaS / Managed Services</div>
+        <div class="infra-row">
+          <div class="inode"><div class="inode-icon">🔐</div><div class="inode-name">Auth0</div><div class="inode-detail">Identity provider · MFA · SSO · Enterprise IdP connectors · JWT issuer</div><div><span class="inode-badge ext-badge">SaaS</span></div></div>
+          <div class="inode"><div class="inode-icon">📧</div><div class="inode-name">SES / SendGrid</div><div class="inode-detail">Transactional email · User invites · Notifications · Report delivery</div><div><span class="inode-badge ext-badge">SaaS</span></div></div>
+          <div class="inode"><div class="inode-icon">🤖</div><div class="inode-name">OpenAI / Anthropic</div><div class="inode-detail">AI features · NL-to-query · Report summaries · Insights (optional)</div><div><span class="inode-badge ext-badge">SaaS</span></div></div>
+        </div>
+      </div>
+
+      <div class="connector-row">
+        <div class="connector"><div class="connector-line blue"></div><span>Embed token → browser</span></div>
+        <div class="connector"><div class="connector-line amber"></div><span>Azure AD service principal</span></div>
+      </div>
+
+      <!-- Power BI Azure -->
+      <div class="cloud-zone azure-ext">
+        <div class="zone-label azure-ext">☁ Microsoft Azure — Power BI Service</div>
+        <div class="infra-row">
+          <div class="inode"><div class="inode-icon">📊</div><div class="inode-name">Power BI Embedded (A1 SKU)</div><div class="inode-detail">~$735/mo · Reserved capacity · ~300 concurrent renders · Autoscale to A2/A3</div><div><span class="inode-badge ext-badge">Azure</span></div></div>
+          <div class="inode"><div class="inode-icon">📁</div><div class="inode-name">Power BI Workspaces</div><div class="inode-detail">One workspace per tenant (recommended) · Reports · Datasets · RLS configured</div><div><span class="inode-badge ext-badge">Azure</span></div></div>
+          <div class="inode"><div class="inode-icon">🔑</div><div class="inode-name">Azure AD App Registration</div><div class="inode-detail">Service principal · Used by Embed Token Service only · Credentials in Secrets Manager</div><div><span class="inode-badge ext-badge">Azure AD</span></div></div>
+        </div>
+      </div>
+
+      <!-- Flow key -->
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
+        <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Key Request Paths</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent);border-radius:1px;flex-shrink:0;"></div>Page load: User → CloudFront → WAF → ALB → ECS Next.js (SSR) → RDS (tenant config)</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent2);border-radius:1px;flex-shrink:0;"></div>Login: Browser → Auth0 (OIDC) → JWT in httpOnly cookie → all subsequent API calls</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent3);border-radius:1px;flex-shrink:0;"></div>Report load: Browser → Embed Svc → Redis (cache hit?) → PBI REST API → embed token → browser → Power BI renders</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent4);border-radius:1px;flex-shrink:0;"></div>Secrets: ECS tasks pull from Secrets Manager at startup — never baked into images or env vars</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ COST CALCULATOR ══ -->
+  <div class="panel" id="panel-cost">
+
+    <!-- Context banner -->
+    <div style="background:rgba(0,196,255,0.06);border:1px solid rgba(0,196,255,0.2);border-radius:10px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:20px;">📋</div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:3px;">Based on your inputs</div>
+        <div style="font-size:13px;color:var(--text-dim);">10–50 tenants at launch → 50–200 at 12mo &nbsp;·&nbsp; 500–2,000 peak concurrent users &nbsp;·&nbsp; AWS or Azure hosting. Sliders pre-loaded to mid-range of your estimates.</div>
+      </div>
+    </div>
+
+    <!-- Cloud provider toggle at top level -->
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text-dim);white-space:nowrap;">☁ Cloud Provider:</div>
+      <div class="control-options">
+        <button class="opt-btn active" id="opt-cloud-aws" onclick="setCloud('aws')">AWS (ap-southeast-2)</button>
+        <button class="opt-btn" id="opt-cloud-azure" onclick="setCloud('azure')">Azure (australiaeast)</button>
+      </div>
+      <div id="cloud-note" style="font-size:11px;color:var(--text-muted);margin-left:8px;"></div>
+      <div style="margin-left:auto;">
+        <button class="opt-btn" id="btn-compare" onclick="toggleCompare()" style="border-color:var(--accent3);color:var(--accent3);">⇄ Compare Both</button>
+      </div>
+    </div>
+
+    <!-- Side-by-side comparison (hidden by default) -->
+    <div id="compare-panel" style="display:none;margin-bottom:24px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.15em;margin-bottom:14px;">AWS vs Azure — Cost Comparison (based on current slider values)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div style="background:var(--surface);border:1px solid rgba(245,158,11,0.3);border-radius:10px;overflow:hidden;">
+          <div style="background:rgba(245,158,11,0.08);padding:12px 16px;border-bottom:1px solid rgba(245,158,11,0.2);font-size:12px;font-weight:600;color:var(--accent4);">☁ AWS ap-southeast-2</div>
+          <div id="compare-aws" style="padding:14px 16px;"></div>
+        </div>
+        <div style="background:var(--surface);border:1px solid rgba(96,165,250,0.3);border-radius:10px;overflow:hidden;">
+          <div style="background:rgba(96,165,250,0.08);padding:12px 16px;border-bottom:1px solid rgba(96,165,250,0.2);font-size:12px;font-weight:600;color:#60a5fa;">☁ Azure australiaeast</div>
+          <div id="compare-azure" style="padding:14px 16px;"></div>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-dim);line-height:1.6;" id="compare-verdict"></div>
+    </div>
+
+    <div class="cost-layout">
+      <div class="cost-controls">
+        <div class="cost-controls-title">⚙ Parameters</div>
+        <div class="control-group">
+          <div class="control-label">Tenants (launch → 12mo)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Launch <span class="control-value" id="lbl-tenants-launch">25</span></div>
+              <input type="range" min="1" max="200" value="25" id="sl-tenants-launch" oninput="recalc()">
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">12 months <span class="control-value" id="lbl-tenants-scale">100</span></div>
+              <input type="range" min="1" max="500" value="100" id="sl-tenants-scale" oninput="recalc()">
+            </div>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="control-label">Monthly Active Users <span class="control-value" id="lbl-mau">2000</span></div>
+          <input type="range" min="50" max="20000" value="2000" step="100" id="sl-mau" oninput="recalc()">
+        </div>
+        <div class="control-group">
+          <div class="control-label">Peak Concurrent Users <span class="control-value" id="lbl-concurrent">1000</span></div>
+          <input type="range" min="10" max="3000" value="1000" step="50" id="sl-concurrent" oninput="recalc()">
+          <div id="pbi-sku-hint" style="font-size:10px;color:var(--accent4);margin-top:5px;"></div>
+        </div>
+        <div class="control-group">
+          <div class="control-label">Power BI SKU</div>
+          <div class="control-options">
+            <button class="opt-btn" id="opt-a1" onclick="setPBI('A1')">A1 · $735</button>
+            <button class="opt-btn active" id="opt-a2" onclick="setPBI('A2')">A2 · $1,470</button>
+            <button class="opt-btn" id="opt-a3" onclick="setPBI('A3')">A3 · $2,941</button>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:5px;">A1 ≈ 300 concurrent · A2 ≈ 600 · A3 ≈ 1,200</div>
+        </div>
+        <div class="control-group">
+          <div class="control-label">Auth Provider</div>
+          <div class="control-options">
+            <button class="opt-btn active" id="opt-auth0" onclick="setAuth('auth0')">Auth0</button>
+            <button class="opt-btn" id="opt-azuread" onclick="setAuth('azuread')">Azure AD B2C</button>
+          </div>
+          <div id="auth-note" style="font-size:10px;color:var(--text-muted);margin-top:5px;"></div>
+        </div>
+        <div class="control-group">
+          <div class="control-label">AI Features</div>
+          <div class="control-options">
+            <button class="opt-btn active" id="opt-ai-off" onclick="setAI(false)">Off</button>
+            <button class="opt-btn" id="opt-ai-on" onclick="setAI(true)">On</button>
+          </div>
+        </div>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5;margin-bottom:8px;">Compute pricing:</div>
+          <div class="control-options">
+            <button class="opt-btn active" id="opt-od" onclick="setRI(false)">On-demand</button>
+            <button class="opt-btn" id="opt-ri" onclick="setRI(true)">Reserved (1yr ~35% off)</button>
+          </div>
+        </div>
+
+        <!-- Key insight box -->
+        <div id="insight-box" style="margin-top:20px;padding:14px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--accent4);"></div>
+      </div>
+
+      <div>
+        <div class="cost-summary">
+          <div class="cost-stat">
+            <div class="cost-stat-label">Launch /mo</div>
+            <div class="cost-stat-value" id="stat-launch">$0</div>
+            <div class="cost-stat-sub" id="stat-launch-sub">~25 tenants</div>
+          </div>
+          <div class="cost-stat warn">
+            <div class="cost-stat-label">12 Months /mo</div>
+            <div class="cost-stat-value" id="stat-scale">$0</div>
+            <div class="cost-stat-sub" id="stat-scale-sub">~100 tenants</div>
+          </div>
+          <div class="cost-stat highlight">
+            <div class="cost-stat-label">Year 1 Total</div>
+            <div class="cost-stat-value" id="stat-annual">$0</div>
+            <div class="cost-stat-sub">6mo launch + 6mo scale</div>
+          </div>
+        </div>
+
+        <!-- PBI as % warning bar -->
+        <div id="pbi-warning" style="margin-bottom:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:none;">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;">Cost Breakdown by Category</div>
+          <div id="cost-bar-chart"></div>
+        </div>
+
+        <div class="cost-breakdown">
+          <div class="breakdown-header">
+            <div>Service</div><div>Tier</div><div>Launch /mo</div><div>Scale /mo</div><div></div>
+          </div>
+          <div id="breakdown-rows"></div>
+          <div class="cost-footer">
+            <div class="cf-label">Total</div><div></div>
+            <div class="cf-launch" id="footer-launch">$0</div>
+            <div class="cf-scale" id="footer-scale">$0</div>
+            <div></div>
+          </div>
+        </div>
+
+        <div class="cost-notes">
+          <div class="cost-notes-title">📌 Notes for your scale (500–2,000 concurrent users)</div>
+          <div class="cost-note"><div class="cost-note-dot" style="background:var(--accent4)"></div><div class="cost-note-text"><strong style="color:var(--text)">Power BI A2 SKU is strongly recommended at your scale.</strong> 500–2,000 concurrent users means A1 (300 max) will be insufficient at peak. A2 at $1,470/mo handles up to ~600 concurrent renders. At 2,000 concurrent you'd need A3 ($2,941/mo). This is your biggest cost lever — plan for A2 at minimum.</div></div>
+          <div class="cost-note"><div class="cost-note-dot" style="background:var(--accent3)"></div><div class="cost-note-text"><strong style="color:var(--text)">AWS vs Azure:</strong> For your scale, AWS is slightly cheaper on compute and has better Fargate tooling. Azure wins if your team already uses Azure DevOps or if keeping everything in one Microsoft ecosystem (Power BI + Azure AD B2C + App Service) simplifies your ops model. Both are within ~10% of each other in total cost.</div></div>
+          <div class="cost-note"><div class="cost-note-dot" style="background:var(--accent2)"></div><div class="cost-note-text"><strong style="color:var(--text)">Auth0 vs Azure AD B2C at 2,000 MAU:</strong> Auth0 costs ~$0 (under 7,500 MAU free tier). At 50+ tenants with enterprise SSO connections, it becomes significant. Azure AD B2C has 50,000 MAU free — meaningful at your scale.</div></div>
+          <div class="cost-note"><div class="cost-note-dot" style="background:var(--accent)"></div><div class="cost-note-text"><strong style="color:var(--text)">50–200 tenants means tenant config caching is critical.</strong> Every tenant has a navigation tree, branding, and report mappings. At 200 tenants, Redis caching of this config saves ~200 DB round-trips per minute at peak. Budget for a slightly larger Redis cluster than the minimum.</div></div>
+          <div class="cost-note"><div class="cost-note-dot" style="background:var(--accent5)"></div><div class="cost-note-text"><strong style="color:var(--text)">Reserved Instances save ~$400–600/mo</strong> at this scale on AWS. Commit after 3 months when traffic patterns are clear — at 1-year no-upfront it's a near-zero risk commitment.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RLS ══ -->
+  <div class="panel" id="panel-rls">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px;line-height:1.6;">This is the most critical security flow. Power BI enforces row-level security based on identity claims we inject into the embed token. Here's the step-by-step flow every time a user loads a report:</p>
+    <div class="rls-flow">
+      <div class="rls-step"><div class="rls-num" style="background:rgba(0,196,255,0.1);border:1px solid var(--accent);color:var(--accent)">1</div><div class="rls-step-content"><h4>User authenticates</h4><p>User logs in via Auth0/Azure AD B2C. A JWT is issued containing user ID, email, tenant ID, and roles. Stored in a secure httpOnly cookie.</p><code>{ sub, email, tenantId, roles[], orgId }</code></div></div>
+      <div class="rls-step"><div class="rls-num" style="background:rgba(124,58,237,0.1);border:1px solid var(--accent2);color:var(--accent2)">2</div><div class="rls-step-content"><h4>Frontend requests embed token</h4><p>When a report page loads, the frontend calls our backend — passing the user's JWT in the cookie automatically.</p><code>POST /api/reports/:reportId/embed-token</code></div></div>
+      <div class="rls-step"><div class="rls-num" style="background:rgba(245,158,11,0.1);border:1px solid var(--accent4);color:var(--accent4)">3</div><div class="rls-step-content"><h4>Backend validates + resolves context</h4><p>Embed Token Service verifies the JWT, resolves tenant config, and determines which Power BI workspace and report this user can access.</p><code>tenantId → workspaceId + reportId + RLS role</code></div></div>
+      <div class="rls-step"><div class="rls-num" style="background:rgba(16,185,129,0.1);border:1px solid var(--accent3);color:var(--accent3)">4</div><div class="rls-step-content"><h4>Embed token generated with RLS claims</h4><p>We call the Power BI REST API using a service principal. We pass the user's identity and the RLS role. Power BI returns a short-lived embed token (1 hour).</p><code>GenerateTokenInGroup({ roles: [{ name, username }] })</code></div></div>
+      <div class="rls-step"><div class="rls-num" style="background:rgba(0,196,255,0.1);border:1px solid var(--accent);color:var(--accent)">5</div><div class="rls-step-content"><h4>Token cached in Redis</h4><p>The embed token is cached in Redis keyed by user + report + tenant for ~45 minutes to avoid hammering the Power BI API on every page load.</p><code>pbi:embed:{tenantId}:{userId}:{reportId} (TTL 45m)</code></div></div>
+      <div class="rls-step"><div class="rls-num" style="background:rgba(244,114,182,0.1);border:1px solid #f472b6;color:#f472b6">6</div><div class="rls-step-content"><h4>Frontend embeds the report</h4><p>The embed token is returned to the frontend. The Power BI SDK renders the report. Power BI enforces RLS server-side — the user can only see rows matching their identity.</p><code>powerbi.embed(element, { type: 'report', accessToken })</code></div></div>
+      <div class="rls-step"><div class="rls-num" style="background:rgba(245,158,11,0.1);border:1px solid var(--accent4);color:var(--accent4)">7</div><div class="rls-step-content"><h4>Silent token refresh</h4><p>The frontend tracks token expiry. Before it expires, it silently requests a new embed token. No page reload — the SDK supports hot token swap.</p></div></div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--accent4);border-radius:10px;padding:18px;">
+      <div style="font-size:12px;font-weight:600;color:var(--accent4);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">⚠️ Key Security Principle</div>
+      <p style="font-size:13px;color:var(--text-dim);line-height:1.6;">Power BI service principal credentials and workspace IDs <strong style="color:var(--text)">never reach the browser</strong>. All Power BI REST API calls happen server-side. The frontend only receives short-lived embed tokens. Tenants are isolated at both the application layer (our DB) and the Power BI layer (RLS roles).</p>
+    </div>
+  </div>
+
+  <!-- ══ TRADEOFFS ══ -->
+  <div class="panel" id="panel-tradeoffs">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px;line-height:1.6;">Every architecture decision involves trade-offs. Here are the meaningful ones:</p>
+    <div class="tradeoff-grid">
+      <div class="tradeoff-card"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(0,196,255,0.1)">⚛️</div><div><div class="tradeoff-title">Next.js full-stack vs separate Frontend + API</div><div class="tradeoff-subtitle">Co-location vs independent scaling</div></div></div><div class="tradeoff-body">Next.js lets us co-locate frontend and BFF logic, use Server Actions for secure operations, and deploy as a single unit.</div><div class="pro-con"><div class="pro"><div class="pro-title">Pros</div><ul><li>Simpler deployment</li><li>SSR for fast first load</li><li>One CI/CD pipeline</li></ul></div><div class="con"><div class="con-title">Cons</div><ul><li>Harder to scale independently</li><li>Larger deploy surface</li><li>Vercel lock-in risk</li></ul></div></div></div>
+      <div class="tradeoff-card"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(124,58,237,0.1)">🔐</div><div><div class="tradeoff-title">Auth0 vs Roll-Your-Own Auth</div><div class="tradeoff-subtitle">Cost vs control</div></div></div><div class="tradeoff-body">Auth0 gives us battle-tested MFA, SSO, and enterprise identity connectors without building from scratch.</div><div class="pro-con"><div class="pro"><div class="pro-title">Auth0 Pros</div><ul><li>MFA/SSO out of box</li><li>Enterprise connectors</li><li>Faster to market</li></ul></div><div class="con"><div class="con-title">Cons</div><ul><li>Monthly cost at scale</li><li>External dependency</li><li>Less flow flexibility</li></ul></div></div></div>
+      <div class="tradeoff-card"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(16,185,129,0.1)">📊</div><div><div class="tradeoff-title">Keep Power BI vs Native Charts</div><div class="tradeoff-subtitle">Speed to market vs long-term cost</div></div></div><div class="tradeoff-body">Power BI is powerful and familiar but adds A-SKU cost and creates Microsoft dependency. Native charts give full control.</div><div class="pro-con"><div class="pro"><div class="pro-title">Keep PBI</div><ul><li>No rebuild effort</li><li>Rich built-in features</li><li>Stakeholders know it</li></ul></div><div class="con"><div class="con-title">Go Native</div><ul><li>Eliminate A-SKU cost</li><li>Full design control</li><li>Significant dev effort</li></ul></div></div></div>
+      <div class="tradeoff-card"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(245,158,11,0.1)">🗄️</div><div><div class="tradeoff-title">Shared DB vs Isolated schemas</div><div class="tradeoff-subtitle">Cost vs isolation strength</div></div></div><div class="tradeoff-body">Shared database with tenantId column + Postgres RLS is simpler and cheaper. Schema-per-tenant offers stronger isolation but painful migrations.</div><div class="pro-con"><div class="pro"><div class="pro-title">Shared DB</div><ul><li>Lower cost</li><li>Simple migrations</li><li>Easier to operate</li></ul></div><div class="con"><div class="con-title">Isolated schemas</div><ul><li>Stronger isolation</li><li>Better compliance story</li><li>Complex migrations</li></ul></div></div></div>
+      <div class="tradeoff-card" style="grid-column:1/-1;"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(0,196,255,0.1)">🪜</div><div><div class="tradeoff-title">Migration: Big Bang vs Incremental</div><div class="tradeoff-subtitle">Risk vs speed</div></div></div><div class="tradeoff-body" style="margin-bottom:12px;">Run both systems in parallel briefly, migrate tenants in waves starting with internal users, use feature flags to toggle per tenant.</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;"><div style="background:var(--surface2);border-radius:6px;padding:11px;border-top:2px solid var(--accent)"><div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:3px;">Phase 1</div><div style="font-size:11px;color:var(--text-muted)">Build new platform · Internal users only</div></div><div style="background:var(--surface2);border-radius:6px;padding:11px;border-top:2px solid var(--accent2)"><div style="font-size:11px;font-weight:700;color:var(--accent2);margin-bottom:3px;">Phase 2</div><div style="font-size:11px;color:var(--text-muted)">Pilot external tenants · Feature flag toggle</div></div><div style="background:var(--surface2);border-radius:6px;padding:11px;border-top:2px solid var(--accent3)"><div style="font-size:11px;font-weight:700;color:var(--accent3);margin-bottom:3px;">Phase 3</div><div style="font-size:11px;color:var(--text-muted)">Wave migration of remaining tenants</div></div><div style="background:var(--surface2);border-radius:6px;padding:11px;border-top:2px solid var(--accent4)"><div style="font-size:11px;font-weight:700;color:var(--accent4);margin-bottom:3px;">Phase 4</div><div style="font-size:11px;color:var(--text-muted)">Decommission Reporting Hub</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- ══ SCALABILITY ══ -->
+  <div class="panel" id="panel-scalability">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px;line-height:1.6;">The two scalability concerns that will matter earliest and most:</p>
+    <div class="scale-grid">
+      <div class="scale-card" style="border-top:2px solid var(--accent)"><div class="scale-header"><div class="scale-dot" style="background:var(--accent)"></div>Power BI Capacity Costs</div><div class="scale-item"><div class="scale-item-title">The problem</div><div class="scale-item-desc">A-SKU is billed by reserved capacity, not per-user. An A1 (~$735/mo) supports ~300 concurrent renders. Heavy usage or many tenants scales costs fast.</div></div><div class="scale-item"><div class="scale-item-title">Mitigation: Embed token caching</div><div class="scale-item-desc">Cache tokens in Redis for 45 minutes. Avoids hitting the PBI API on every page load. Reduces latency and rate limit exposure significantly.</div></div><div class="scale-item"><div class="scale-item-title">Long-term: Native chart migration</div><div class="scale-item-desc">For simple, high-volume reports, native charts eliminate the A-SKU cost entirely. Identify candidates early.</div></div></div>
+      <div class="scale-card" style="border-top:2px solid var(--accent3)"><div class="scale-header"><div class="scale-dot" style="background:var(--accent3)"></div>Multi-tenant Data Isolation</div><div class="scale-item"><div class="scale-item-title">The problem</div><div class="scale-item-desc">As tenant count grows, a poorly designed tenancy model creates noisy-neighbour problems, security risk, and painful migrations.</div></div><div class="scale-item"><div class="scale-item-title">Shared DB + Postgres RLS</div><div class="scale-item-desc">Single Postgres DB with tenantId on all tables. RLS policies enforce isolation at the DB layer — even if application code has a bug.</div></div><div class="scale-item"><div class="scale-item-title">Connection pooling</div><div class="scale-item-desc">PgBouncer in transaction mode. At scale, naive connection-per-request kills Postgres. Pool and reuse aggressively.</div></div></div>
+      <div class="scale-card" style="border-top:2px solid var(--accent4)"><div class="scale-header"><div class="scale-dot" style="background:var(--accent4)"></div>Auth at Scale</div><div class="scale-item"><div class="scale-item-title">Token validation</div><div class="scale-item-desc">JWT RS256 verify is ~0.1ms. Cache Auth0 JWKS public keys locally. Don't call Auth0 on every request — only on key rotation.</div></div><div class="scale-item"><div class="scale-item-title">Per-tenant rate limiting</div><div class="scale-item-desc">Redis-backed sliding window rate limits per tenant and per endpoint. Prevents one tenant degrading others.</div></div></div>
+      <div class="scale-card" style="border-top:2px solid var(--accent2)"><div class="scale-header"><div class="scale-dot" style="background:var(--accent2)"></div>Observability from Day 1</div><div class="scale-item"><div class="scale-item-title">Why it matters early</div><div class="scale-item-desc">Retrofitting observability is painful. Wire up structured logging (tenantId, userId on every log line), traces, and business metrics from the start.</div></div><div class="scale-item"><div class="scale-item-title">Key metrics</div><div class="scale-item-desc">Embed token latency · Report load time per tenant · Auth failure rate · PBI capacity utilisation · API error rates.</div></div></div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<div class="backdrop" id="backdrop" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detail-panel">
+  <button class="detail-close" onclick="closeDetail()">✕ close</button>
+  <div id="detail-content"></div>
+</div>
+
+<script>
+function showPanel(name,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  if(btn)btn.classList.add('active');
+}
+
+const details={
+  nextjs:{tag:'Client Tier',title:'Next.js Frontend',desc:'The core of the user-facing application. SSR for fast initial loads, React Server Components for reduced bundle size, App Router for clean nested routing perfect for multi-tenant nav hierarchy.',points:['App Router with nested layouts — one per tenant branding context','Server Components for auth-protected pages — token validated server-side','Client Components only where interactivity is needed','TypeScript throughout — catches tenant/role context bugs at compile time'],tech:['Next.js 14+','React 18','TypeScript','App Router','Server Actions'],techColor:'primary'},
+  'pbi-embed':{tag:'Client Tier',title:'Power BI Embed SDK',desc:'powerbi-client-react handles report rendering. It takes an embed token from our backend and communicates directly with Power BI. RLS is enforced by Microsoft — the browser never sees raw data.',points:['Receives short-lived embed token from our backend only','Renders report in a sandboxed context','Supports token refresh without page reload','Event hooks for load state, errors, and interactions we can log'],tech:['powerbi-client-react','powerbi-models','Embed Token API'],techColor:'primary'},
+  ui:{tag:'Client Tier',title:'Design System',desc:'Consistent, high-quality component library on Tailwind and Radix primitives. Enables the "polished UI/UX" goal — every component is accessible, themeable per tenant, and consistent.',points:['Tailwind CSS — easy to theme per tenant via CSS variables','shadcn/ui + Radix for accessible primitives','Framer Motion for transitions and micro-interactions','Tenant branding applied via CSS custom properties at layout level'],tech:['Tailwind CSS','shadcn/ui','Radix UI','Framer Motion'],techColor:'primary'},
+  auth0:{tag:'Identity & Auth',title:'Auth0 / Azure AD B2C',desc:'Managed identity provider giving us MFA, SSO, enterprise IdP connectors (SAML, Azure AD, Google Workspace), and compliance-grade security without building from scratch.',points:['OIDC / OAuth 2.0 — industry standard','JWT on login: user ID, email, tenantId, roles','MFA enforceable per tenant policy','SSO: enterprise customers bring their own IdP'],tech:['Auth0','Azure AD B2C','OIDC','OAuth 2.0','SAML'],techColor:'purple'},
+  rbac:{tag:'Identity & Auth',title:'RBAC + Tenant Context',desc:'Role-based access control + tenant isolation. Every request carries tenant ID and our backend enforces users only access their own tenant\'s data.',points:['Roles: Admin, Viewer, Editor (extensible per tenant)','Tenant ID baked into JWT — validated on every API request','Permissions enforced at API layer, not just UI','PBI RLS role mapped from tenantId + role at token generation'],tech:['JWT Claims','RBAC','Postgres RLS','Middleware'],techColor:'purple'},
+  session:{tag:'Identity & Auth',title:'Session Management',desc:'Short-lived access tokens (15 min) and refresh tokens (7 days). Stored in httpOnly secure cookies — not localStorage — immune to XSS. Token rotation on every refresh.',points:['Access token: 15 min, RS256 signed JWT','Refresh token: 7 days, rotated on use','httpOnly, Secure, SameSite=Strict cookies','Silent refresh before expiry — no page reload needed'],tech:['httpOnly Cookies','JWT RS256','Refresh Token Rotation'],techColor:'purple'},
+  gateway:{tag:'API Gateway',title:'API Gateway / BFF',desc:'Backend-For-Frontend layer between Next.js and backend services. Handles routing, rate limiting, and provides a clean surface for the frontend.',points:['Next.js API routes serve as the BFF — keeps it simple','Validates JWT on every request','Redis-backed per-tenant rate limits','Response shaping: transforms service responses into frontend shapes'],tech:['Next.js API Routes','JWT Validation','Redis Rate Limiting'],techColor:'amber'},
+  middleware:{tag:'API Gateway',title:'Middleware Layer',desc:'Cross-cutting concerns on every request: tenant resolution, audit logging, security headers, CORS.',points:['Tenant resolution: extracts tenantId from JWT, validates active','Audit logging: every mutation logged with user, tenant, action, timestamp','Security headers via Helmet: HSTS, CSP, X-Frame-Options','CORS: whitelist per-tenant allowed origins'],tech:['Helmet.js','Next.js Middleware','Structured Logging'],techColor:'amber'},
+  api:{tag:'Backend Services',title:'Core API',desc:'Central business logic layer. Handles all CRUD operations, tenant config, navigation menus, and report metadata.',points:['Fastify — faster than Express, excellent TypeScript support','Handles: user management, tenant config, navigation trees, page → report mappings','All queries include tenantId filter enforced at ORM level','Zod input validation — rejects malformed requests before DB'],tech:['Node.js','Fastify','Drizzle ORM','Zod','TypeScript'],techColor:'green'},
+  'embed-service':{tag:'Backend Services',title:'Embed Token Service',desc:'Most security-critical service. Generates Power BI embed tokens server-side using a service principal, injecting the correct RLS identity. Credentials never leave the server.',points:['Authenticates to PBI REST API using Service Principal','Resolves user → tenant → workspace → report → RLS role','Calls GenerateTokenInGroup with user\'s username for RLS','Returns 1-hour embed token — nothing more','Caches in Redis: pbi:embed:{tenantId}:{userId}:{reportId} (45min TTL)'],tech:['Power BI REST API','Service Principal','Redis Cache','Azure AD'],techColor:'green'},
+  'tenant-service':{tag:'Backend Services',title:'Tenant Service',desc:'Manages all tenant-specific config: branding, navigation menus, feature flags, report-to-page mappings. Replaces the Reporting Hub admin UI.',points:['Tenant CRUD: create tenants, configure branding','Navigation tree management: define page hierarchy per tenant','Report mapping: link pages to Power BI report IDs','Feature flags: enable/disable features per tenant','Cached in Redis — no DB hit on every page load'],tech:['PostgreSQL','Redis','Admin API','Feature Flags'],techColor:'green'},
+  'ai-service':{tag:'Backend Services',title:'AI / Analytics Service',desc:'Optional but high-value. Enables natural language querying, AI-generated insights, and intelligent summaries. Where we differentiate most from Reporting Hub.',points:['NL to data query: translate questions to safe, read-only, tenant-scoped SQL','AI-generated report summaries in plain text','Anomaly detection: flag unusual patterns','OpenAI GPT-4o or Anthropic Claude via API'],tech:['OpenAI API','Anthropic API','LangChain','Structured outputs'],techColor:'green'},
+  postgres:{tag:'Data Layer',title:'PostgreSQL',desc:'Primary operational database. All application state: tenants, users, roles, config, audit logs. Postgres RLS enforces tenant isolation at the DB layer.',points:['All tables include tenantId foreign key','Postgres RLS policies as a safety net below app layer','AWS RDS Multi-AZ for high availability','Read replica for analytics/audit queries','PgBouncer connection pooling (transaction mode)'],tech:['PostgreSQL 16','Postgres RLS','PgBouncer','Drizzle ORM'],techColor:'amber'},
+  redis:{tag:'Data Layer',title:'Redis',desc:'In-memory cache and session store. Embed token caching alone eliminates most Power BI REST API calls, which are slow (200–500ms).',points:['Embed token cache: 45min TTL, keyed by user+report+tenant','Tenant config cache: nav trees, branding','Rate limit counters: sliding window per tenant/user/endpoint'],tech:['Redis 7','ioredis','AWS ElastiCache'],techColor:'amber'},
+  blob:{tag:'Data Layer',title:'Blob Storage',desc:'Object storage for assets that don\'t belong in the relational DB: tenant logos, exported reports.',points:['Tenant logos served via CloudFront CDN','Report exports stored temporarily with pre-signed URLs','Versioning enabled, SSE-S3 encryption'],tech:['S3','CloudFront CDN','Pre-signed URLs'],techColor:'amber'},
+  observability:{tag:'Data Layer',title:'Observability Stack',desc:'Full visibility: structured logs, distributed traces, business metrics. Non-negotiable for production multi-tenant SaaS.',points:['Structured logging: every log line includes tenantId, userId, requestId','Distributed tracing: trace request from browser → DB → PBI API','Metrics: report load time, embed latency, auth failures, PBI capacity','Alerting: page on-call when error rate spikes or PBI hits 80% capacity'],tech:['DataDog','OpenTelemetry','Pino logger','CloudWatch'],techColor:'amber'},
+  'pbi-service':{tag:'Power BI',title:'Power BI Embedded (A-SKU)',desc:'A-SKU for embedding in external-facing apps without end users needing PBI licences. Reserved capacity billed monthly.',points:['A1 SKU: ~$735/month, ~300 concurrent renders','Autoscale to A2/A3 for higher concurrency','One workspace per tenant recommended','RLS enforced entirely by Power BI — we pass identity via embed token'],tech:['Power BI A-SKU','Azure','PBI Workspaces'],techColor:'primary'},
+  'pbi-api':{tag:'Power BI',title:'Power BI REST API',desc:'Used server-side only by Embed Token Service to generate tokens and manage reports. Never called from the browser.',points:['GenerateTokenInGroup: embed token with RLS identity','GetReports / GetDatasets: list available reports for admin UI','Dataset refresh: trigger scheduled data refreshes','Authenticated via Service Principal — not a user account'],tech:['Power BI REST API','Service Principal','MSAL','Azure AD'],techColor:'primary'},
+  'pbi-rls':{tag:'Power BI',title:'Row-Level Security',desc:'PBI RLS restricts what data a user sees. Defined as DAX filters keyed on role + username. Our backend injects these into the embed token.',points:['RLS roles defined in PBI dataset (e.g. "TenantViewer")','DAX filter: [TenantId] = USERPRINCIPALNAME()','We pass: { roles: [{ name: "TenantViewer", username: "tenant-123" }] }','Power BI enforces the filter — users cannot see other tenants\' data','customData claim for more complex multi-dimension RLS scenarios'],tech:['DAX Filters','RLS Roles','Username claim','CustomData claim'],techColor:'primary'}
+};
+
+function showDetail(key){
+  const d=details[key];if(!d)return;
+  const tc=d.techColor||'primary';
+  document.getElementById('detail-content').innerHTML=`
+    <div class="detail-tag">${d.tag}</div>
+    <div class="detail-title">${d.title}</div>
+    <div class="detail-desc">${d.desc}</div>
+    <div class="detail-section"><div class="detail-section-title">Key Points</div>${d.points.map(p=>`<div class="detail-item"><div class="detail-item-dot"></div><div class="detail-item-text">${p}</div></div>`).join('')}</div>
+    <div class="detail-section"><div class="detail-section-title">Technologies</div><div class="detail-tech">${d.tech.map(t=>`<span class="tech-badge ${tc}">${t}</span>`).join('')}</div></div>`;
+  document.getElementById('detail-panel').classList.add('open');
+  document.getElementById('backdrop').classList.add('open');
+}
+function closeDetail(){document.getElementById('detail-panel').classList.remove('open');document.getElementById('backdrop').classList.remove('open');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail();});
+
+// ── COST CALCULATOR ──
+let pbiSKU='A2', authProvider='auth0', aiEnabled=false, riEnabled=false, cloudProvider='aws', showingCompare=false;
+const pbiCosts={A1:735,A2:1470,A3:2941};
+const pbiDesc={A1:'~300 concurrent renders',A2:'~600 concurrent renders',A3:'~1,200 concurrent renders'};
+
+function setPBI(s){pbiSKU=s;['A1','A2','A3'].forEach(k=>document.getElementById('opt-'+k.toLowerCase()).classList.toggle('active',k===s));recalc();}
+function setAuth(p){authProvider=p;document.getElementById('opt-auth0').classList.toggle('active',p==='auth0');document.getElementById('opt-azuread').classList.toggle('active',p==='azuread');recalc();}
+function setAI(on){aiEnabled=on;document.getElementById('opt-ai-off').classList.toggle('active',!on);document.getElementById('opt-ai-on').classList.toggle('active',on);recalc();}
+function setRI(on){riEnabled=on;document.getElementById('opt-od').classList.toggle('active',!on);document.getElementById('opt-ri').classList.toggle('active',on);recalc();}
+function setCloud(c){
+  cloudProvider=c;
+  document.getElementById('opt-cloud-aws').classList.toggle('active',c==='aws');
+  document.getElementById('opt-cloud-azure').classList.toggle('active',c==='azure');
+  document.getElementById('cloud-note').textContent=c==='azure'?'Azure App Service + Azure Cache for Redis + Azure Database for PostgreSQL':'ECS Fargate + ElastiCache + RDS PostgreSQL';
+  recalc();
+}
+function toggleCompare(){
+  showingCompare=!showingCompare;
+  document.getElementById('compare-panel').style.display=showingCompare?'block':'none';
+  document.getElementById('btn-compare').style.borderColor=showingCompare?'var(--accent5)':null;
+  document.getElementById('btn-compare').style.color=showingCompare?'var(--accent5)':null;
+  document.getElementById('btn-compare').textContent=showingCompare?'✕ Hide Comparison':'⇄ Compare Both';
+  if(showingCompare)recalc();
+}
+
+function fmt(n){return'$'+Math.round(n).toLocaleString();}
+
+// Build cost model for a given cloud + params
+function buildCosts(cloud, tenantsLaunch, tenantsScale, mau, concurrent, ri){
+  const pbiL=pbiCosts[pbiSKU], pbiS=pbiCosts[pbiSKU];
+
+  // Auth - same regardless of cloud
+  let authL,authS,authName;
+  if(authProvider==='auth0'){
+    authL=Math.max(0,(mau-7500)*0.0023);
+    authS=Math.max(0,(mau*2-7500)*0.0023);
+    authName='Auth0';
+  } else {
+    authL=Math.max(0,(mau-50000)*0.00016);
+    authS=Math.max(0,(mau*2-50000)*0.00016);
+    authName='Azure AD B2C';
+  }
+
+  const launchTaskCount=6, scaleTaskCount=Math.max(18,Math.ceil(concurrent/15)*3);
+
+  let services;
+  if(cloud==='aws'){
+    // AWS ap-southeast-2 pricing
+    const taskHr=(0.5*0.04856)+(1*0.00532); // Fargate vCPU + mem
+    const fargateL=taskHr*launchTaskCount*730*ri;
+    const fargateS=taskHr*scaleTaskCount*730*ri;
+    const rdsL=67*2*ri; // db.t4g.medium Multi-AZ
+    const rdsS=(tenantsScale>100?134:67)*2*ri;
+    const redisL=13.9*2; // cache.t4g.micro × 2
+    const redisS=13.9*(concurrent>800?4:3);
+    const cfL=10, cfS=Math.round(10+mau*0.005);
+    const albL=18, albS=Math.round(16+concurrent*0.055);
+    const wafL=12, wafS=Math.round(12+tenantsScale*0.15);
+    services=[
+      {icon:'🌐',name:'CloudFront CDN',desc:'Global edge caching',tier:'Managed',launch:cfL,scale:cfS},
+      {icon:'🛡️',name:'AWS WAF',desc:'Web application firewall',tier:'Managed',launch:wafL,scale:wafS},
+      {icon:'⚖️',name:'ALB (Load Balancer)',desc:'Multi-AZ · SSL termination',tier:'Multi-AZ',launch:albL,scale:albS},
+      {icon:'🐳',name:'ECS Fargate',desc:`${launchTaskCount} tasks → ${scaleTaskCount} tasks`,tier:'Auto-scale',launch:fargateL,scale:fargateS},
+      {icon:'🐘',name:'RDS PostgreSQL',desc:'db.t4g.medium · Multi-AZ',tier:'Multi-AZ',launch:rdsL,scale:rdsS},
+      {icon:'⚡',name:'ElastiCache Redis',desc:'cache.t4g.micro cluster',tier:'Clustered',launch:redisL,scale:redisS},
+      {icon:'🗄️',name:'S3 + Storage',desc:'Assets · exports · backups',tier:'Managed',launch:5,scale:Math.round(5+tenantsScale*0.15)},
+      {icon:'🔒',name:'Secrets Manager',desc:'Credentials + API keys',tier:'Managed',launch:8,scale:12},
+      {icon:'📡',name:'CloudWatch',desc:'Logs · metrics · alarms',tier:'Managed',launch:15,scale:Math.round(15+tenantsScale*0.5)},
+      {icon:'🌐',name:'Route 53',desc:'DNS routing',tier:'Managed',launch:5,scale:5},
+    ];
+  } else {
+    // Azure australiaeast pricing
+    // App Service P2v3: ~$0.21/hr → ~$153/mo per instance, need 4–12 at this scale
+    const appSvcHr=0.21*ri;
+    const appSvcL=appSvcHr*4*730; // 4 instances launch
+    const appSvcS=appSvcHr*Math.max(8,Math.ceil(concurrent/80))*730;
+    // Azure DB for PostgreSQL Flexible — General Purpose D2s v3: ~$0.19/hr → ~$139/mo
+    const pgL=139*2*ri; // zone redundant
+    const pgS=(tenantsScale>100?278:139)*2*ri;
+    // Azure Cache for Redis C2: ~$134/mo
+    const redisAzL=134;
+    const redisAzS=concurrent>800?268:134;
+    // Azure CDN (Front Door Standard): ~$35/mo base
+    const cdnL=35, cdnS=Math.round(35+mau*0.006);
+    // Azure App Gateway WAF: ~$0.036/hr + $0.011/GB → ~$30/mo
+    const agwL=30, agwS=Math.round(28+concurrent*0.04);
+    // Azure Monitor: ~$0.30/GB logs ingested
+    const monL=20, monS=Math.round(20+tenantsScale*0.6);
+    // Azure Key Vault: ~$0.03/10k operations
+    const kvL=6, kvS=10;
+    // Blob Storage: ~$0.02/GB
+    const blobL=5, blobS=Math.round(5+tenantsScale*0.15);
+    // Azure DNS: $0.90/zone/mo
+    const dnsL=5, dnsS=5;
+    services=[
+      {icon:'🌐',name:'Azure Front Door (CDN)',desc:'Global edge · WAF included',tier:'Managed',launch:cdnL,scale:cdnS},
+      {icon:'⚖️',name:'App Gateway + WAF',desc:'Zone redundant · SSL',tier:'Zone-HA',launch:agwL,scale:agwS},
+      {icon:'🐳',name:'App Service (P2v3)',desc:`${4} instances → ${Math.max(8,Math.ceil(concurrent/80))} instances`,tier:'Auto-scale',launch:appSvcL,scale:appSvcS},
+      {icon:'🐘',name:'Azure DB PostgreSQL',desc:'Flexible · Zone redundant',tier:'Zone-HA',launch:pgL,scale:pgS},
+      {icon:'⚡',name:'Azure Cache for Redis',desc:'C2 standard cluster',tier:'Clustered',launch:redisAzL,scale:redisAzS},
+      {icon:'🗄️',name:'Blob Storage',desc:'Assets · exports · backups',tier:'Managed',launch:blobL,scale:blobS},
+      {icon:'🔒',name:'Azure Key Vault',desc:'Secrets + certificates',tier:'Managed',launch:kvL,scale:kvS},
+      {icon:'📡',name:'Azure Monitor',desc:'Logs · metrics · alerts',tier:'Managed',launch:monL,scale:monS},
+      {icon:'🌐',name:'Azure DNS',desc:'DNS zones routing',tier:'Managed',launch:dnsL,scale:dnsS},
+    ];
+  }
+
+  // Shared costs regardless of cloud
+  services.push({icon:'📊',name:`Power BI Embedded (${pbiSKU})`,desc:pbiDesc[pbiSKU],tier:'Azure',launch:pbiL,scale:pbiS});
+  services.push({icon:'🔐',name:authName,desc:`${mau.toLocaleString()} → ${(mau*2).toLocaleString()} MAU`,tier:'SaaS',launch:authL,scale:authS});
+  if(aiEnabled){services.push({icon:'🤖',name:'AI API (OpenAI/Anthropic)',desc:`~${mau.toLocaleString()} users`,tier:'SaaS',launch:mau*0.025,scale:mau*0.06});}
+
+  return services;
+}
+
+function recalc(){
+  const tenantsLaunch=parseInt(document.getElementById('sl-tenants-launch').value);
+  const tenantsScale=parseInt(document.getElementById('sl-tenants-scale').value);
+  const mau=parseInt(document.getElementById('sl-mau').value);
+  const concurrent=parseInt(document.getElementById('sl-concurrent').value);
+
+  document.getElementById('lbl-tenants-launch').textContent=tenantsLaunch;
+  document.getElementById('lbl-tenants-scale').textContent=tenantsScale;
+  document.getElementById('lbl-mau').textContent=mau.toLocaleString();
+  document.getElementById('lbl-concurrent').textContent=concurrent;
+
+  const ri=riEnabled?0.65:1.0;
+
+  // PBI SKU hint
+  const neededSKU=concurrent>1200?'A3':concurrent>600?'A2':concurrent>300?'A2':'A1';
+  const skuWarnings={A1:'⚠️ A1 only handles ~300 concurrent — may be insufficient at your peak.',A2:'✓ A2 handles ~600 concurrent — good for mid-range peaks.',A3:'✓ A3 handles ~1,200 concurrent — good for your upper scale estimate.'};
+  document.getElementById('pbi-sku-hint').textContent=skuWarnings[pbiSKU]||'';
+
+  // Auth note
+  const authNote=authProvider==='auth0'
+    ?`Auth0 free tier: 7,500 MAU. Your ${mau.toLocaleString()} MAU = ${mau<=7500?'within free tier ✓':'paid tier, ~'+fmt((mau-7500)*0.0023)+'/mo'}`
+    :`Azure AD B2C: 50,000 MAU free. Your ${mau.toLocaleString()} MAU = ${mau<=50000?'within free tier ✓':'paid tier, ~'+fmt((mau-50000)*0.00016)+'/mo'}`;
+  document.getElementById('auth-note').textContent=authNote;
+
+  const services=buildCosts(cloudProvider,tenantsLaunch,tenantsScale,mau,concurrent,ri);
+  const totalLaunch=services.reduce((s,r)=>s+r.launch,0);
+  const totalScale=services.reduce((s,r)=>s+r.scale,0);
+  const maxVal=Math.max(...services.map(r=>r.scale),1);
+
+  document.getElementById('breakdown-rows').innerHTML=services.map(r=>`
+    <div class="breakdown-row">
+      <div class="br-service"><div class="br-icon">${r.icon}</div><div><div class="br-name">${r.name}</div><div class="br-desc">${r.desc}</div></div></div>
+      <div class="br-tier">${r.tier}</div>
+      <div class="br-launch">${fmt(r.launch)}</div>
+      <div class="br-scale">${fmt(r.scale)}</div>
+      <div><div class="br-bar-inner" style="width:${Math.round(r.scale/maxVal*100)}%;background:${r.name.includes('Power BI')?'var(--accent4)':r.tier==='SaaS'?'var(--accent2)':'var(--accent)'}"></div></div>
+    </div>`).join('');
+
+  document.getElementById('footer-launch').textContent=fmt(totalLaunch);
+  document.getElementById('footer-scale').textContent=fmt(totalScale);
+  document.getElementById('stat-launch').textContent=fmt(totalLaunch);
+  document.getElementById('stat-scale').textContent=fmt(totalScale);
+  document.getElementById('stat-annual').textContent=fmt(totalLaunch*6+totalScale*6);
+  document.getElementById('stat-launch-sub').textContent=`~${tenantsLaunch} tenants`;
+  document.getElementById('stat-scale-sub').textContent=`~${tenantsScale} tenants`;
+
+  // Insight box
+  const pbiPct=Math.round((pbiCosts[pbiSKU]/totalScale)*100);
+  const riSaving=riEnabled?0:Math.round(totalScale*0.12); // ~12% of total if RI applied
+  document.getElementById('insight-box').innerHTML=`
+    <div style="font-size:11px;font-weight:600;color:var(--accent4);margin-bottom:6px;">💡 Key insight</div>
+    <div style="font-size:11px;color:var(--text-dim);line-height:1.6;">
+      Power BI ${pbiSKU} is <strong style="color:var(--text)">${pbiPct}% of your monthly cost</strong> at scale.
+      ${!riEnabled?`Switching to Reserved Instances would save ~${fmt(riSaving)}/mo on compute.`:'Reserved Instances applied — ~35% saving on compute.'}
+      ${pbiSKU==='A1'&&concurrent>300?'<span style="color:var(--accent5)"> ⚠️ Consider upgrading to A2 — your concurrent load may exceed A1 capacity.</span>':''}
+    </div>`;
+
+  // Cost bar chart
+  const pbiVal=pbiCosts[pbiSKU];
+  const computeVal=services.filter(s=>s.name.includes('Fargate')||s.name.includes('App Service')).reduce((a,s)=>a+s.scale,0);
+  const dataVal=services.filter(s=>s.name.includes('PostgreSQL')||s.name.includes('Redis')).reduce((a,s)=>a+s.scale,0);
+  const authVal=services.find(s=>s.name.includes('Auth'))?.scale||0;
+  const otherVal=totalScale-pbiVal-computeVal-dataVal-authVal;
+  const categories=[
+    {label:'Power BI',val:pbiVal,color:'var(--accent4)'},
+    {label:'Compute',val:computeVal,color:'var(--accent)'},
+    {label:'Database',val:dataVal,color:'#f472b6'},
+    {label:'Auth',val:authVal,color:'var(--accent2)'},
+    {label:'Other',val:Math.max(0,otherVal),color:'var(--text-muted)'},
+  ];
+  document.getElementById('pbi-warning').style.display='block';
+  document.getElementById('cost-bar-chart').innerHTML=categories.map(c=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;">
+      <div style="width:70px;font-size:10px;color:var(--text-muted);text-align:right;font-family:'IBM Plex Mono',monospace;">${c.label}</div>
+      <div style="flex:1;height:16px;background:var(--surface2);border-radius:3px;overflow:hidden;">
+        <div style="width:${Math.round(c.val/totalScale*100)}%;height:100%;background:${c.color};border-radius:3px;transition:width 0.4s ease;"></div>
+      </div>
+      <div style="width:55px;font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;">${fmt(c.val)} <span style="color:var(--text-muted);font-size:9px;">${Math.round(c.val/totalScale*100)}%</span></div>
+    </div>`).join('');
+
+  // Comparison panel
+  if(showingCompare){
+    ['aws','azure'].forEach(cloud=>{
+      const s=buildCosts(cloud,tenantsLaunch,tenantsScale,mau,concurrent,ri);
+      const tL=s.reduce((a,r)=>a+r.launch,0);
+      const tS=s.reduce((a,r)=>a+r.scale,0);
+      document.getElementById('compare-'+cloud).innerHTML=`
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:6px;">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Launch /mo</div>
+            <div style="font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;">${fmt(tL)}</div>
+          </div>
+          <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:6px;">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Scale /mo</div>
+            <div style="font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--accent4);">${fmt(tS)}</div>
+          </div>
+        </div>
+        ${s.slice(0,5).map(r=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;"><span style="color:var(--text-dim)">${r.icon} ${r.name}</span><span style="font-family:'IBM Plex Mono',monospace;color:var(--text)">${fmt(r.scale)}</span></div>`).join('')}
+        <div style="font-size:10px;color:var(--text-muted);margin-top:6px;">+ ${s.length-5} more services…</div>`;
+    });
+    const awsS=buildCosts('aws',tenantsLaunch,tenantsScale,mau,concurrent,ri).reduce((a,r)=>a+r.scale,0);
+    const azureS=buildCosts('azure',tenantsLaunch,tenantsScale,mau,concurrent,ri).reduce((a,r)=>a+r.scale,0);
+    const diff=Math.abs(awsS-azureS);
+    const cheaper=awsS<azureS?'AWS':'Azure';
+    document.getElementById('compare-verdict').innerHTML=`
+      <strong style="color:var(--text)">${cheaper} is ~${fmt(diff)}/mo cheaper at scale</strong> for your parameters (~${Math.round(diff/Math.max(awsS,azureS)*100)}% difference). 
+      ${cheaper==='AWS'?'AWS wins on Fargate flexibility and granular auto-scaling at this concurrency level.':'Azure wins if you consolidate on Microsoft stack — Power BI, Azure AD B2C, and App Service in one ecosystem reduces operational overhead.'} 
+      <strong style="color:var(--accent)">Recommendation:</strong> If your team has stronger AWS experience, go AWS. If you're already buying Azure services or want to simplify the Power BI billing relationship, Azure is a clean choice.`;
+  }
+}
+
+// Initialise with your specific parameters
+document.getElementById('cloud-note').textContent='ECS Fargate + ElastiCache + RDS PostgreSQL';
+recalc();
+</script>
+</body>
+</html>
