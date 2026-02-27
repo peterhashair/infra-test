@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform Architecture – Plan B – Sapiant</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+  :root {
+    --bg:#0a0e1a;--surface:#111827;--surface2:#1a2235;--border:#1e2d45;--border-bright:#2a3f5e;
+    --accent:#00e5a0;--accent2:#7c3aed;--accent3:#3b82f6;--accent4:#f59e0b;--accent5:#ef4444;
+    --accent6:#f472b6;
+    --text:#e2e8f0;--text-muted:#64748b;--text-dim:#94a3b8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,160,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,160,0.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .container{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:40px 32px;}
+  header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid var(--border);}
+  .header-left h1{font-size:13px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);font-family:'IBM Plex Mono',monospace;margin-bottom:10px;}
+  .header-left h2{font-size:32px;font-weight:700;line-height:1.1;}
+  .header-left h2 span{color:var(--accent);}
+  .header-left p{margin-top:10px;color:var(--text-dim);font-size:15px;max-width:520px;line-height:1.6;}
+  .plan-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.3);border-radius:6px;padding:4px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);margin-bottom:12px;}
+  .vs-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:6px;padding:3px 10px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent4);margin-top:8px;}
+  .header-meta{text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-muted);line-height:2;}
+  .tabs{display:flex;gap:4px;margin-bottom:32px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:fit-content;flex-wrap:wrap;}
+  .tab{padding:8px 16px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;color:var(--text-muted);border:none;background:transparent;font-family:'IBM Plex Sans',sans-serif;}
+  .tab:hover{color:var(--text);background:var(--surface2);}
+  .tab.active{background:var(--accent);color:#0a0e1a;font-weight:600;}
+  .panel{display:none;animation:fadeIn 0.3s ease;}
+  .panel.active{display:block;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  /* ARCH */
+  .arch-diagram{display:grid;gap:16px;}
+  .tier{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px;transition:border-color 0.2s;}
+  .tier:hover{border-color:var(--border-bright);}
+  .tier-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+  .tier-label::after{content:'';flex:1;height:1px;background:var(--border);}
+  .tier-label.client{color:var(--accent);}
+  .tier-label.identity{color:var(--accent2);}
+  .tier-label.bff{color:var(--accent4);}
+  .tier-label.backend{color:var(--accent3);}
+  .tier-label.charts{color:#f472b6;}
+  .tier-label.data{color:#fb923c;}
+  .tier-row{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;}
+  .box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;flex:1;min-width:160px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;}
+  .box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;transition:opacity 0.2s;opacity:0;}
+  .box:hover{border-color:var(--border-bright);transform:translateY(-1px);}
+  .box:hover::before{opacity:1;}
+  .box.ac-green::before{background:var(--accent);}
+  .box.ac-purple::before{background:var(--accent2);}
+  .box.ac-blue::before{background:var(--accent3);}
+  .box.ac-amber::before{background:var(--accent4);}
+  .box.ac-pink::before{background:#f472b6;}
+  .box.ac-orange::before{background:#fb923c;}
+  .box:hover.ac-green{border-color:var(--accent);}
+  .box:hover.ac-purple{border-color:var(--accent2);}
+  .box:hover.ac-blue{border-color:var(--accent3);}
+  .box:hover.ac-amber{border-color:var(--accent4);}
+  .box:hover.ac-pink{border-color:#f472b6;}
+  .box:hover.ac-orange{border-color:#fb923c;}
+  .box-icon{font-size:20px;margin-bottom:8px;}
+  .box-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;}
+  .box-sub{font-size:11px;color:var(--text-muted);line-height:1.4;}
+  .new-badge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:9px;padding:1px 6px;border-radius:3px;background:rgba(0,229,160,0.15);border:1px solid rgba(0,229,160,0.4);color:var(--accent);margin-top:5px;}
+  .replaced-badge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:9px;padding:1px 6px;border-radius:3px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:var(--accent5);margin-top:5px;text-decoration:line-through;}
+  .flow-arrows{display:flex;justify-content:center;align-items:center;padding:4px 0;gap:32px;color:var(--text-muted);font-size:11px;font-family:'IBM Plex Mono',monospace;}
+  .arrow-item{display:flex;align-items:center;gap:6px;flex-direction:column;}
+  .arrow-line{width:1px;height:24px;background:linear-gradient(to bottom,var(--border),transparent);position:relative;}
+  .arrow-line::after{content:'▼';position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--border-bright);}
+  .legend{display:flex;gap:20px;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;}
+  .legend-dot{width:8px;height:8px;border-radius:2px;}
+  .hint{display:inline-block;font-size:11px;color:var(--text-muted);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:'IBM Plex Mono',monospace;margin-bottom:16px;}
+
+  /* DETAIL PANEL */
+  .detail-panel{position:fixed;right:0;top:0;bottom:0;width:400px;background:var(--surface);border-left:1px solid var(--border);padding:32px 28px;transform:translateX(100%);transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);z-index:100;overflow-y:auto;}
+  .detail-panel.open{transform:translateX(0);}
+  .detail-close{position:absolute;top:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-family:'IBM Plex Mono',monospace;transition:all 0.2s;}
+  .detail-close:hover{border-color:var(--accent5);color:var(--accent5);}
+  .detail-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
+  .detail-title{font-size:20px;font-weight:700;margin-bottom:16px;}
+  .detail-desc{font-size:14px;color:var(--text-dim);line-height:1.7;margin-bottom:20px;}
+  .detail-section{margin-bottom:20px;}
+  .detail-section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:10px;font-family:'IBM Plex Mono',monospace;}
+  .detail-item{display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;}
+  .detail-item-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:6px;flex-shrink:0;}
+  .detail-item-text{font-size:13px;color:var(--text-dim);line-height:1.5;}
+  .detail-tech{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .tech-badge{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:3px 10px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);}
+  .tech-badge.green{border-color:var(--accent);color:var(--accent);background:rgba(0,229,160,0.06);}
+  .tech-badge.purple{border-color:var(--accent2);color:var(--accent2);background:rgba(124,58,237,0.06);}
+  .tech-badge.blue{border-color:var(--accent3);color:var(--accent3);background:rgba(59,130,246,0.06);}
+  .tech-badge.amber{border-color:var(--accent4);color:var(--accent4);background:rgba(245,158,11,0.06);}
+  .tech-badge.pink{border-color:#f472b6;color:#f472b6;background:rgba(244,114,182,0.06);}
+  .backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99;}
+  .backdrop.open{display:block;}
+
+  /* DIFF TAB */
+  .diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;}
+  .diff-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .diff-card-header{padding:14px 18px;font-size:12px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;display:flex;align-items:center;gap:8px;}
+  .diff-card-header.plan-a{background:rgba(0,196,255,0.06);border-bottom:1px solid rgba(0,196,255,0.2);color:#00c4ff;}
+  .diff-card-header.plan-b{background:rgba(0,229,160,0.06);border-bottom:1px solid rgba(0,229,160,0.2);color:var(--accent);}
+  .diff-card-body{padding:16px 18px;}
+  .diff-row{display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;padding-bottom:10px;border-bottom:1px solid var(--border);}
+  .diff-row:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+  .diff-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+  .diff-content-title{font-size:13px;font-weight:600;margin-bottom:2px;}
+  .diff-content-sub{font-size:11px;color:var(--text-muted);line-height:1.4;}
+  .diff-outcome{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:24px;}
+  .diff-outcome-title{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--accent4);margin-bottom:14px;}
+  .outcome-row{display:grid;grid-template-columns:160px 1fr 1fr;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
+  .outcome-row:last-child{border-bottom:none;}
+  .outcome-label{font-size:11px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;}
+  .outcome-cell{font-size:12px;color:var(--text-dim);}
+  .outcome-cell.better{color:var(--accent);}
+  .outcome-cell.worse{color:var(--accent5);}
+  .outcome-cell.neutral{color:var(--accent4);}
+  .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-family:'IBM Plex Mono',monospace;}
+  .pill.green{background:rgba(0,229,160,0.12);color:var(--accent);}
+  .pill.red{background:rgba(239,68,68,0.1);color:var(--accent5);}
+  .pill.amber{background:rgba(245,158,11,0.1);color:var(--accent4);}
+
+  /* ECHARTS DEEP DIVE */
+  .echarts-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}
+  .ec-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;transition:border-color 0.2s;}
+  .ec-card:hover{border-color:var(--border-bright);}
+  .ec-card-icon{font-size:24px;margin-bottom:10px;}
+  .ec-card-title{font-size:13px;font-weight:600;margin-bottom:6px;}
+  .ec-card-desc{font-size:12px;color:var(--text-muted);line-height:1.5;}
+  .ec-card-badge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 8px;border-radius:3px;margin-top:8px;}
+
+  /* BFF FLOW */
+  .bff-flow{display:grid;gap:0;margin-bottom:24px;}
+  .bff-step{display:grid;grid-template-columns:40px 1fr;gap:16px;align-items:flex-start;padding:14px 8px;border-bottom:1px solid var(--border);transition:background 0.2s;border-radius:6px;}
+  .bff-step:hover{background:var(--surface2);}
+  .bff-step:last-child{border-bottom:none;}
+  .bff-num{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;flex-shrink:0;}
+  .bff-step-content h4{font-size:13px;font-weight:600;margin-bottom:4px;}
+  .bff-step-content p{font-size:12px;color:var(--text-muted);line-height:1.5;}
+  .bff-step-content code{font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--surface2);border:1px solid var(--border);padding:2px 6px;border-radius:3px;color:var(--accent);display:inline-block;margin-top:4px;}
+
+  /* COST */
+  .cost-layout{display:grid;grid-template-columns:290px 1fr;gap:24px;align-items:start;}
+  .cost-controls{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;position:sticky;top:20px;}
+  .cost-controls-title{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--accent);margin-bottom:20px;}
+  .control-group{margin-bottom:16px;}
+  .control-label{font-size:12px;font-weight:600;color:var(--text-dim);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
+  .control-value{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent);background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:4px;padding:1px 7px;}
+  input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--border);outline:none;margin-top:4px;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 8px rgba(0,229,160,0.4);}
+  .control-options{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+  .opt-btn{padding:4px 10px;border-radius:5px;font-size:11px;font-family:'IBM Plex Mono',monospace;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all 0.15s;}
+  .opt-btn:hover{border-color:var(--border-bright);color:var(--text);}
+  .opt-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,229,160,0.08);}
+  .cost-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+  .cost-stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;text-align:center;}
+  .cost-stat-label{font-size:10px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.08em;font-family:'IBM Plex Mono',monospace;}
+  .cost-stat-value{font-size:26px;font-weight:700;color:var(--text);font-family:'IBM Plex Mono',monospace;}
+  .cost-stat-sub{font-size:10px;color:var(--text-muted);margin-top:3px;}
+  .cost-stat.highlight{border-color:var(--accent);}.cost-stat.highlight .cost-stat-value{color:var(--accent);}
+  .cost-stat.warn{border-color:var(--accent4);}.cost-stat.warn .cost-stat-value{color:var(--accent4);}
+  .cost-breakdown{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .breakdown-header{display:grid;grid-template-columns:1fr 90px 90px 100px 28px;gap:8px;padding:11px 18px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;}
+  .breakdown-row{display:grid;grid-template-columns:1fr 90px 90px 100px 28px;gap:8px;padding:11px 18px;border-bottom:1px solid var(--border);align-items:center;transition:background 0.15s;}
+  .breakdown-row:last-child{border-bottom:none;}
+  .breakdown-row:hover{background:var(--surface2);}
+  .br-service{display:flex;align-items:center;gap:9px;}
+  .br-icon{font-size:16px;}.br-name{font-size:13px;font-weight:500;}.br-desc{font-size:10px;color:var(--text-muted);}
+  .br-tier{font-size:11px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;}
+  .br-launch{font-size:13px;font-weight:600;font-family:'IBM Plex Mono',monospace;}
+  .br-scale{font-size:13px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--accent4);}
+  .br-bar-inner{height:4px;border-radius:2px;transition:width 0.4s ease;}
+  .cost-footer{display:grid;grid-template-columns:1fr 90px 90px 100px 28px;gap:8px;padding:13px 18px;background:var(--surface2);border-top:2px solid var(--border);font-weight:700;font-family:'IBM Plex Mono',monospace;}
+  .cf-label{font-size:13px;color:var(--text);}
+  .cf-launch{font-size:14px;color:var(--accent);}
+  .cf-scale{font-size:14px;color:var(--accent4);}
+  .cost-notes{margin-top:18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;}
+  .cost-notes-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;font-family:'IBM Plex Mono',monospace;}
+  .cost-note{display:flex;gap:10px;margin-bottom:8px;}
+  .cost-note-dot{width:6px;height:6px;border-radius:50%;margin-top:6px;flex-shrink:0;}
+  .cost-note-text{font-size:12px;color:var(--text-dim);line-height:1.5;}
+
+  /* INFRA */
+  .infra-canvas{min-width:860px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:32px;}
+  .infra-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);margin-bottom:28px;display:flex;align-items:center;gap:10px;}
+  .infra-title::after{content:'';flex:1;height:1px;background:var(--border);}
+  .cloud-zone{border:1px dashed;border-radius:12px;padding:20px;margin-bottom:16px;position:relative;}
+  .cloud-zone.aws{border-color:rgba(0,229,160,0.3);background:rgba(0,229,160,0.018);}
+  .cloud-zone.saas-ext{border-color:rgba(124,58,237,0.35);background:rgba(124,58,237,0.02);}
+  .cloud-zone.users-zone{border-color:rgba(59,130,246,0.25);background:rgba(59,130,246,0.015);}
+  .zone-label{position:absolute;top:-11px;left:20px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;padding:0 8px;background:var(--surface);}
+  .zone-label.aws{color:var(--accent);}
+  .zone-label.saas-ext{color:var(--accent2);}
+  .zone-label.users-zone{color:var(--accent3);}
+  .infra-row{display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;margin-bottom:12px;}
+  .infra-row:last-child{margin-bottom:0;}
+  .inode{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;flex:1;min-width:130px;transition:all 0.2s;}
+  .inode:hover{border-color:var(--border-bright);transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,0.3);}
+  .inode-icon{font-size:17px;margin-bottom:5px;}
+  .inode-name{font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;}
+  .inode-detail{font-size:10px;color:var(--text-muted);line-height:1.4;}
+  .inode-badge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:9px;padding:1px 6px;border-radius:3px;margin-top:5px;}
+  .inode-badge.managed{background:rgba(0,229,160,0.12);color:var(--accent);border:1px solid rgba(0,229,160,0.3);}
+  .inode-badge.ha{background:rgba(59,130,246,0.1);color:var(--accent3);border:1px solid rgba(59,130,246,0.3);}
+  .inode-badge.ext-badge{background:rgba(124,58,237,0.1);color:var(--accent2);border:1px solid rgba(124,58,237,0.3);}
+  .inode-badge.new{background:rgba(0,229,160,0.12);color:var(--accent);border:1px solid rgba(0,229,160,0.4);}
+  .infra-section-label{font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;margin-top:4px;}
+  .connector-row{display:flex;justify-content:center;align-items:center;padding:4px 0;gap:48px;}
+  .connector{display:flex;flex-direction:column;align-items:center;gap:2px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-muted);}
+  .connector-line{width:1px;height:26px;position:relative;}
+  .connector-line::after{content:'▼';position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);font-size:8px;}
+  .connector-line.green{background:linear-gradient(to bottom,rgba(0,229,160,0.5),transparent);}.connector-line.green::after{color:var(--accent);}
+  .connector-line.purple{background:linear-gradient(to bottom,rgba(124,58,237,0.5),transparent);}.connector-line.purple::after{color:var(--accent2);}
+  .connector-line.blue{background:linear-gradient(to bottom,rgba(59,130,246,0.5),transparent);}.connector-line.blue::after{color:var(--accent3);}
+  .az-container{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;}
+  .az-zone{border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:12px;background:rgba(255,255,255,0.012);}
+  .az-label{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;}
+  .az-items{display:flex;flex-direction:column;gap:7px;}
+  .az-item{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 11px;font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:8px;}
+  .az-item-icon{font-size:14px;}
+
+  /* TRADEOFFS */
+  .tradeoff-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .tradeoff-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;}
+  .tradeoff-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .tradeoff-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+  .tradeoff-title{font-size:14px;font-weight:600;}.tradeoff-subtitle{font-size:11px;color:var(--text-muted);}
+  .tradeoff-body{font-size:13px;color:var(--text-dim);line-height:1.6;}
+  .pro-con{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;}
+  .pro,.con{background:var(--surface2);border-radius:6px;padding:10px 12px;}
+  .pro{border-top:2px solid var(--accent);}.con{border-top:2px solid var(--accent5);}
+  .pro-title,.con-title{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;}
+  .pro-title{color:var(--accent);}.con-title{color:var(--accent5);}
+  .pro li,.con li{font-size:11px;color:var(--text-muted);margin-bottom:3px;list-style:none;padding-left:12px;position:relative;line-height:1.4;}
+  .pro li::before{content:'+';position:absolute;left:0;color:var(--accent);}
+  .con li::before{content:'−';position:absolute;left:0;color:var(--accent5);}
+
+  @media(max-width:900px){
+    .cost-layout{grid-template-columns:1fr;}.cost-controls{position:static;}
+    .tradeoff-grid{grid-template-columns:1fr;}.diff-grid{grid-template-columns:1fr;}
+    .echarts-grid{grid-template-columns:1fr 1fr;}
+    .cost-summary{grid-template-columns:1fr;}
+    .az-container{grid-template-columns:1fr;}
+    .breakdown-header,.breakdown-row,.cost-footer{grid-template-columns:1fr 70px 70px 80px;}
+    .breakdown-header>:last-child,.breakdown-row>:last-child,.cost-footer>:last-child{display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-left">
+      <div class="plan-badge">⬡ Plan B — Alternative Architecture</div>
+      <h1>Architecture Design</h1>
+      <h2>Reporting Hub <span>Replacement</span></h2>
+      <p>Decoupled React SPA + dedicated BFF layer + Apache ECharts. No Power BI dependency — full UI ownership, zero A-SKU licensing cost, and completely independent scaling.</p>
+      <div class="vs-badge">⇄ Compare with Plan A (Next.js + Power BI) in the "Plan A vs B" tab</div>
+    </div>
+    <div class="header-meta">
+      <div>Prepared for Sapiant</div>
+      <div>Feb 2026</div>
+      <div style="margin-top:8px;color:var(--accent);font-weight:600;">Click boxes for details →</div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showPanel('architecture',this)">Architecture</button>
+    <button class="tab" onclick="showPanel('infra',this)">Infrastructure</button>
+    <button class="tab" onclick="showPanel('bff',this)">BFF Layer</button>
+    <button class="tab" onclick="showPanel('echarts',this)">ECharts Deep Dive</button>
+    <button class="tab" onclick="showPanel('cost',this)">Cost Calculator</button>
+    <button class="tab" onclick="showPanel('tradeoffs',this)">Trade-offs</button>
+    <button class="tab" onclick="showPanel('diff',this)">Plan A vs B</button>
+  </div>
+
+  <!-- ══ ARCHITECTURE ══ -->
+  <div class="panel active" id="panel-architecture">
+    <span class="hint">Click any component for details</span>
+    <div class="arch-diagram">
+
+      <!-- CLIENT -->
+      <div class="tier">
+        <div class="tier-label client">Client Tier — React SPA (decoupled)</div>
+        <div class="tier-row">
+          <div class="box ac-green" onclick="showDetail('react')">
+            <div class="box-icon">⚛️</div><div class="box-title">React 18 SPA</div>
+            <div class="box-sub">Vite · React Router v7 · TanStack Query · TypeScript</div>
+            <span class="new-badge">replaces Next.js</span>
+          </div>
+          <div class="box ac-green" onclick="showDetail('echarts-client')">
+            <div class="box-icon">📊</div><div class="box-title">Apache ECharts</div>
+            <div class="box-sub">echarts-for-react · Custom themes · SVG/Canvas renderer</div>
+            <span class="new-badge">replaces Power BI</span>
+          </div>
+          <div class="box ac-green" onclick="showDetail('ui')">
+            <div class="box-icon">🎨</div><div class="box-title">Design System</div>
+            <div class="box-sub">Tailwind CSS · shadcn/ui · Radix · Framer Motion</div>
+          </div>
+          <div class="box ac-green" onclick="showDetail('state')">
+            <div class="box-icon">🗃️</div><div class="box-title">Client State</div>
+            <div class="box-sub">Zustand · TanStack Query · React Context for auth</div>
+            <span class="new-badge">explicit state layer</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-arrows">
+        <div class="arrow-item"><div class="arrow-line"></div><span>HTTPS / REST</span></div>
+        <div class="arrow-item"><div class="arrow-line"></div><span>JWT in cookie</span></div>
+        <div class="arrow-item"><div class="arrow-line"></div><span>WebSocket / SSE</span></div>
+      </div>
+
+      <!-- IDENTITY -->
+      <div class="tier">
+        <div class="tier-label identity">Identity & Auth</div>
+        <div class="tier-row">
+          <div class="box ac-purple" onclick="showDetail('auth0')">
+            <div class="box-icon">🔐</div><div class="box-title">Auth0 / Azure AD B2C</div>
+            <div class="box-sub">OIDC · OAuth 2.0 · MFA · SSO · Social login</div>
+          </div>
+          <div class="box ac-purple" onclick="showDetail('rbac')">
+            <div class="box-icon">🧩</div><div class="box-title">RBAC + Tenant Context</div>
+            <div class="box-sub">Roles · Permissions · Tenant isolation in JWT</div>
+          </div>
+          <div class="box ac-purple" onclick="showDetail('session')">
+            <div class="box-icon">🪪</div><div class="box-title">Session Management</div>
+            <div class="box-sub">Refresh tokens · Short-lived JWTs · Secure cookies</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-arrows">
+        <div class="arrow-item"><div class="arrow-line"></div><span>Authenticated requests to BFF only</span></div>
+      </div>
+
+      <!-- BFF -->
+      <div class="tier">
+        <div class="tier-label bff">BFF Layer — Backend for Frontend (own service)</div>
+        <div class="tier-row">
+          <div class="box ac-amber" onclick="showDetail('bff-gateway')">
+            <div class="box-icon">🚦</div><div class="box-title">BFF Gateway</div>
+            <div class="box-sub">Fastify · Request aggregation · Response shaping · Rate limiting</div>
+            <span class="new-badge">independent service</span>
+          </div>
+          <div class="box ac-amber" onclick="showDetail('bff-auth')">
+            <div class="box-icon">🛡️</div><div class="box-title">Auth Middleware</div>
+            <div class="box-sub">JWT validation · Tenant resolution · CORS · Audit logging</div>
+          </div>
+          <div class="box ac-amber" onclick="showDetail('bff-cache')">
+            <div class="box-icon">⚡</div><div class="box-title">Response Cache</div>
+            <div class="box-sub">Redis-backed BFF cache · Per-tenant TTLs · Cache-Control headers</div>
+            <span class="new-badge">chart data caching</span>
+          </div>
+          <div class="box ac-amber" onclick="showDetail('bff-transform')">
+            <div class="box-icon">🔄</div><div class="box-title">Data Transform Layer</div>
+            <div class="box-sub">Normalises backend responses → ECharts option format</div>
+            <span class="new-badge">key BFF responsibility</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-arrows">
+        <div class="arrow-item"><div class="arrow-line"></div><span>Internal service calls</span></div>
+      </div>
+
+      <!-- BACKEND -->
+      <div class="tier">
+        <div class="tier-label backend">Backend Services</div>
+        <div class="tier-row">
+          <div class="box ac-blue" onclick="showDetail('api')">
+            <div class="box-icon">⚙️</div><div class="box-title">Core API</div>
+            <div class="box-sub">Node.js · Fastify · REST · Business logic</div>
+          </div>
+          <div class="box ac-blue" onclick="showDetail('chart-data')">
+            <div class="box-icon">📈</div><div class="box-title">Chart Data Service</div>
+            <div class="box-sub">Query engine · Tenant-scoped data · Aggregation pipeline</div>
+            <span class="new-badge">replaces PBI datasets</span>
+          </div>
+          <div class="box ac-blue" onclick="showDetail('tenant-service')">
+            <div class="box-icon">🏢</div><div class="box-title">Tenant Service</div>
+            <div class="box-sub">Config · Feature flags · Nav menus · Branding · Dashboard layouts</div>
+          </div>
+          <div class="box ac-blue" onclick="showDetail('ai-service')">
+            <div class="box-icon">🤖</div><div class="box-title">AI / Analytics Service</div>
+            <div class="box-sub">NL queries → SQL · Insights · OpenAI/Anthropic</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-arrows">
+        <div class="arrow-item"><div class="arrow-line"></div><span>DB queries + data warehouse reads</span></div>
+      </div>
+
+      <!-- DATA -->
+      <div class="tier">
+        <div class="tier-label data">Data & Storage</div>
+        <div class="tier-row">
+          <div class="box ac-orange" onclick="showDetail('postgres')">
+            <div class="box-icon">🐘</div><div class="box-title">PostgreSQL</div>
+            <div class="box-sub">Tenants · Users · Roles · Config · Audit · Dashboard definitions</div>
+          </div>
+          <div class="box ac-orange" onclick="showDetail('warehouse')">
+            <div class="box-icon">🏭</div><div class="box-title">Data Warehouse</div>
+            <div class="box-sub">Redshift / BigQuery · Analytical queries · Pre-aggregated rollups</div>
+            <span class="new-badge">replaces PBI datasets</span>
+          </div>
+          <div class="box ac-orange" onclick="showDetail('redis')">
+            <div class="box-icon">⚡</div><div class="box-title">Redis</div>
+            <div class="box-sub">Chart data cache · Sessions · Rate limits · Dashboard state</div>
+          </div>
+          <div class="box ac-orange" onclick="showDetail('blob')">
+            <div class="box-icon">🗄️</div><div class="box-title">Blob Storage</div>
+            <div class="box-sub">Logos · Exports (CSV/PNG chart) · Dashboard snapshots · S3</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>Client / SPA</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent2)"></div>Identity</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent4)"></div>BFF (own service)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent3)"></div>Backend</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fb923c"></div>Data</div>
+    </div>
+  </div>
+
+  <!-- ══ INFRASTRUCTURE ══ -->
+  <div class="panel" id="panel-infra">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:20px;line-height:1.6;">Plan B is 100% AWS — no Azure dependency at all. Without Power BI, we eliminate the cross-cloud relationship entirely. The React SPA is served from S3/CloudFront; the BFF runs as its own ECS Fargate service.</p>
+    <div style="overflow-x:auto;">
+    <div class="infra-canvas">
+      <div class="infra-title">Infrastructure Diagram — 100% AWS ap-southeast-2</div>
+
+      <div class="cloud-zone users-zone">
+        <div class="zone-label users-zone">Users & Clients</div>
+        <div class="infra-row">
+          <div class="inode"><div class="inode-icon">👤</div><div class="inode-name">Internal Users</div><div class="inode-detail">Sapiant staff · Admin console · Full feature set</div></div>
+          <div class="inode"><div class="inode-icon">🏢</div><div class="inode-name">External Customers</div><div class="inode-detail">Tenant users · Data scoped by RLS · Charts rendered in browser</div></div>
+          <div class="inode"><div class="inode-icon">🌐</div><div class="inode-name">Browser / Mobile</div><div class="inode-detail">React SPA loaded once · All charts render client-side via ECharts</div></div>
+        </div>
+      </div>
+
+      <div class="connector-row">
+        <div class="connector"><div class="connector-line green"></div><span>HTTPS / TLS 1.3</span></div>
+        <div class="connector"><div class="connector-line green"></div><span>CloudFront Edge</span></div>
+      </div>
+
+      <div class="cloud-zone aws">
+        <div class="zone-label aws">☁ AWS — ap-southeast-2 (Sydney) — 100% AWS, no Azure</div>
+
+        <div class="infra-section-label">Edge & CDN — React SPA served as static assets</div>
+        <div class="infra-row" style="margin-bottom:18px;">
+          <div class="inode"><div class="inode-icon">🌐</div><div class="inode-name">CloudFront CDN</div><div class="inode-detail">Serves React SPA bundle (index.html, JS, CSS) · Immutable cache · Global PoPs</div><div><span class="inode-badge managed">Managed</span></div></div>
+          <div class="inode"><div class="inode-icon">📦</div><div class="inode-name">S3 Static Hosting</div><div class="inode-detail">React SPA build artifacts · Versioned deployments · Zero server cost for frontend</div><div><span class="inode-badge new">Plan B change</span></div></div>
+          <div class="inode"><div class="inode-icon">🛡️</div><div class="inode-name">AWS WAF</div><div class="inode-detail">Rate limiting · OWASP Top 10 · Bot protection on API endpoints</div><div><span class="inode-badge managed">Managed</span></div></div>
+          <div class="inode"><div class="inode-icon">⚖️</div><div class="inode-name">ALB (API only)</div><div class="inode-detail">Routes to BFF + backend services only — no frontend SSR needed</div><div><span class="inode-badge ha">Multi-AZ</span></div></div>
+        </div>
+
+        <div class="infra-section-label">Compute — ECS Fargate · 3 separate services, each independently scaled</div>
+        <div class="az-container" style="margin-bottom:18px;">
+          <div class="az-zone">
+            <div class="az-label">Availability Zone A</div>
+            <div class="az-items">
+              <div class="az-item"><div class="az-item-icon">🚦</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">BFF Service (2–8 tasks)</div><div style="font-size:10px;color:var(--text-muted)">0.5 vCPU / 1 GB · Fastify BFF · data shaping</div></div></div>
+              <div class="az-item"><div class="az-item-icon">⚙️</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Core API Service (2–8 tasks)</div><div style="font-size:10px;color:var(--text-muted)">0.5 vCPU / 1 GB · Business logic</div></div></div>
+              <div class="az-item"><div class="az-item-icon">📈</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Chart Data Service (2–6 tasks)</div><div style="font-size:10px;color:var(--text-muted)">1 vCPU / 2 GB · Query-heavy · autoscales on CPU</div></div></div>
+            </div>
+          </div>
+          <div class="az-zone">
+            <div class="az-label">Availability Zone B</div>
+            <div class="az-items">
+              <div class="az-item"><div class="az-item-icon">🚦</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">BFF Service (mirror)</div><div style="font-size:10px;color:var(--text-muted)">Auto-scaled replica of AZ-A</div></div></div>
+              <div class="az-item"><div class="az-item-icon">⚙️</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Core API Service (mirror)</div><div style="font-size:10px;color:var(--text-muted)">Auto-scaled replica of AZ-A</div></div></div>
+              <div class="az-item"><div class="az-item-icon">📈</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Chart Data Service (mirror)</div><div style="font-size:10px;color:var(--text-muted)">Auto-scaled replica of AZ-A</div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="infra-section-label">Data Layer</div>
+        <div class="infra-row" style="margin-bottom:18px;">
+          <div class="inode"><div class="inode-icon">🐘</div><div class="inode-name">RDS PostgreSQL</div><div class="inode-detail">db.t4g.medium → db.t4g.large · Multi-AZ · Read replica · Dashboard definitions stored here</div><div><span class="inode-badge ha">Multi-AZ</span></div></div>
+          <div class="inode"><div class="inode-icon">🏭</div><div class="inode-name">Amazon Redshift Serverless</div><div class="inode-detail">Analytical queries · Pre-aggregated rollups · Charged per query (RPU-hours) · Replaces PBI datasets</div><div><span class="inode-badge new">Plan B change</span></div></div>
+          <div class="inode"><div class="inode-icon">⚡</div><div class="inode-name">ElastiCache Redis</div><div class="inode-detail">Chart data cache · Sessions · Rate limits · Dashboard config cache</div><div><span class="inode-badge ha">Clustered</span></div></div>
+          <div class="inode"><div class="inode-icon">🗄️</div><div class="inode-name">S3 Buckets</div><div class="inode-detail">Assets · Chart PNG exports · Dashboard snapshots · Versioning + SSE-S3</div><div><span class="inode-badge managed">Managed</span></div></div>
+        </div>
+
+        <div class="infra-section-label">CI/CD & Observability</div>
+        <div class="infra-row">
+          <div class="inode"><div class="inode-icon">📦</div><div class="inode-name">ECR (Container Registry)</div><div class="inode-detail">BFF + backend service images · Vulnerability scanning · Immutable tags</div><div><span class="inode-badge managed">Managed</span></div></div>
+          <div class="inode"><div class="inode-icon">🚀</div><div class="inode-name">CodePipeline + CodeBuild</div><div class="inode-detail">CI/CD · Blue-green ECS · React SPA build → S3 deploy · 3 independent pipelines</div><div><span class="inode-badge managed">Managed</span></div></div>
+          <div class="inode"><div class="inode-icon">📡</div><div class="inode-name">CloudWatch</div><div class="inode-detail">Container insights · Chart render error rates · Query latency · Alarms → SNS</div><div><span class="inode-badge managed">Managed</span></div></div>
+        </div>
+      </div>
+
+      <div class="connector-row">
+        <div class="connector"><div class="connector-line purple"></div><span>OIDC login flow</span></div>
+        <div class="connector"><div class="connector-line blue"></div><span>Email / AI APIs</span></div>
+      </div>
+
+      <div class="cloud-zone saas-ext">
+        <div class="zone-label saas-ext">External SaaS — Minimal, no Azure</div>
+        <div class="infra-row">
+          <div class="inode"><div class="inode-icon">🔐</div><div class="inode-name">Auth0</div><div class="inode-detail">Identity provider · MFA · SSO · Enterprise IdP connectors · JWT issuer</div><div><span class="inode-badge ext-badge">SaaS</span></div></div>
+          <div class="inode"><div class="inode-icon">📧</div><div class="inode-name">SES / SendGrid</div><div class="inode-detail">Transactional email · Notifications · Chart digest emails</div><div><span class="inode-badge ext-badge">SaaS</span></div></div>
+          <div class="inode"><div class="inode-icon">🤖</div><div class="inode-name">OpenAI / Anthropic</div><div class="inode-detail">AI features · NL-to-query · Chart insight summaries (optional)</div><div><span class="inode-badge ext-badge">SaaS</span></div></div>
+        </div>
+      </div>
+
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
+        <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Key Request Paths</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent);border-radius:1px;flex-shrink:0;"></div>First load: User → CloudFront → S3 (SPA bundle) → React boots, calls BFF for tenant config + initial chart data</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent2);border-radius:1px;flex-shrink:0;"></div>Login: Browser → Auth0 (OIDC) → JWT in httpOnly cookie → all BFF calls carry tenant context</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent3);border-radius:1px;flex-shrink:0;"></div>Chart load: Browser → BFF (cache hit?) → Chart Data Svc → Redshift → BFF shapes to ECharts format → browser renders SVG</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent4);border-radius:1px;flex-shrink:0;"></div>No Azure dependency — no cross-cloud latency, no PBI service principal, no embed token flow</div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- ══ BFF LAYER ══ -->
+  <div class="panel" id="panel-bff">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px;line-height:1.6;">The BFF (Backend for Frontend) is Plan B's biggest structural difference from Plan A. In Plan A, Next.js API routes acted as a lightweight BFF co-located with the frontend. In Plan B, the BFF is a <strong style="color:var(--text)">dedicated, independently deployed Fastify service</strong> — separating frontend and backend concerns cleanly.</p>
+
+    <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+      <div style="font-size:12px;font-weight:600;color:var(--accent4);margin-bottom:6px;">Why a dedicated BFF in Plan B?</div>
+      <div style="font-size:13px;color:var(--text-dim);line-height:1.6;">Plan A used Next.js API routes as a lightweight BFF — convenient but coupled to the frontend deploy. In Plan B, the React SPA is a static bundle on S3/CloudFront. There's no server-side Node process for the frontend at all. The BFF must therefore be a real service — and since it's a real service, we can give it genuine responsibilities: <strong style="color:var(--text)">aggregating backend calls, transforming data into ECharts format, caching, and enforcing tenant security</strong>.</div>
+    </div>
+
+    <div class="bff-flow">
+      <div class="bff-step"><div class="bff-num" style="background:rgba(0,229,160,0.1);border:1px solid var(--accent);color:var(--accent)">1</div><div class="bff-step-content"><h4>React SPA bootstraps</h4><p>On first load, the SPA calls <code>GET /bff/bootstrap</code> — a single BFF endpoint that returns tenant config, navigation tree, user profile, and feature flags in one shot. Eliminates 4 separate API calls on startup.</p><code>GET /bff/bootstrap → { tenant, user, nav, flags }</code></div></div>
+      <div class="bff-step"><div class="bff-num" style="background:rgba(245,158,11,0.1);border:1px solid var(--accent4);color:var(--accent4)">2</div><div class="bff-step-content"><h4>JWT validated at BFF boundary</h4><p>Every request to the BFF carries the httpOnly JWT cookie. The BFF middleware validates the signature, extracts tenantId + roles, and attaches context to all downstream calls. Backend services trust the BFF header — they don't re-validate JWTs themselves.</p><code>x-tenant-id, x-user-id, x-roles headers (internal only)</code></div></div>
+      <div class="bff-step"><div class="bff-num" style="background:rgba(59,130,246,0.1);border:1px solid var(--accent3);color:var(--accent3)">3</div><div class="bff-step-content"><h4>Chart data request with cache check</h4><p>When a dashboard loads, the SPA requests chart data from the BFF. The BFF checks Redis for a cached response. Cache TTL is configurable per chart type — fast-changing metrics: 30s. Daily aggregates: 30 minutes.</p><code>chart:data:{tenantId}:{chartId}:{params-hash} (TTL varies)</code></div></div>
+      <div class="bff-step"><div class="bff-num" style="background:rgba(244,114,182,0.1);border:1px solid #f472b6;color:#f472b6">4</div><div class="bff-step-content"><h4>Data transformation → ECharts format</h4><p>On a cache miss, the BFF calls the Chart Data Service which returns raw rows from Redshift/PostgreSQL. The BFF's transform layer converts these into a valid ECharts <code>option</code> object — the browser just calls <code>chart.setOption(data)</code>, no client-side data munging.</p><code>raw rows → { series, xAxis, yAxis, legend, tooltip, ... }</code></div></div>
+      <div class="bff-step"><div class="bff-num" style="background:rgba(0,229,160,0.1);border:1px solid var(--accent);color:var(--accent)">5</div><div class="bff-step-content"><h4>Response compression + cache headers</h4><p>BFF gzips all JSON responses. Cache-Control headers instruct TanStack Query on the client when to revalidate. Stale-while-revalidate pattern means charts never block on a slow query — they show cached data immediately, then silently refresh.</p><code>Cache-Control: s-maxage=60, stale-while-revalidate=300</code></div></div>
+      <div class="bff-step"><div class="bff-num" style="background:rgba(124,58,237,0.1);border:1px solid var(--accent2);color:var(--accent2)">6</div><div class="bff-step-content"><h4>Per-tenant rate limiting at BFF</h4><p>Redis-backed sliding window limits per tenant + endpoint. Heavy dashboard users don't impact other tenants. Burst allowance for legitimate spikes (e.g., all users opening a dashboard at the start of a meeting).</p><code>100 req/min per tenant · 2,000 req/min burst (3s window)</code></div></div>
+      <div class="bff-step"><div class="bff-num" style="background:rgba(245,158,11,0.1);border:1px solid var(--accent4);color:var(--accent4)">7</div><div class="bff-step-content"><h4>Audit log emission</h4><p>Every BFF request emits a structured audit event: user, tenant, action, timestamp, latency. Written to CloudWatch Logs with tenantId as a field — queryable for compliance and per-tenant debugging without a separate audit service.</p></div></div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:18px;">
+      <div style="font-size:12px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">🔑 Key BFF Responsibility: ECharts Transform</div>
+      <p style="font-size:13px;color:var(--text-dim);line-height:1.6;">The BFF's most unique responsibility in Plan B is the <strong style="color:var(--text)">data → ECharts option transform</strong>. Backend services return normalised row data. The BFF holds a library of chart-type transformers (bar, line, scatter, heatmap, treemap, etc.) that convert rows into valid ECharts <code>option</code> objects. This keeps the React frontend thin — it receives ready-to-render options, not raw data to process. It also means <strong style="color:var(--text)">chart logic is testable server-side</strong> and tenant-scoped by default.</p>
+    </div>
+  </div>
+
+  <!-- ══ ECHARTS DEEP DIVE ══ -->
+  <div class="panel" id="panel-echarts">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px;line-height:1.6;">Apache ECharts is the core visualisation engine replacing Power BI. It's a fully open-source, highly extensible charting library with no per-user licensing cost. Here's what to know:</p>
+
+    <div class="echarts-grid">
+      <div class="ec-card">
+        <div class="ec-card-icon">📦</div>
+        <div class="ec-card-title">Zero licensing cost</div>
+        <div class="ec-card-desc">Apache 2.0 license. No A-SKU, no per-user fees, no Microsoft dependency. A1 was $735/mo — that's $8,820/yr eliminated.</div>
+        <span class="ec-card-badge" style="background:rgba(0,229,160,0.12);border:1px solid rgba(0,229,160,0.3);color:var(--accent);">saves $8,820+/yr</span>
+      </div>
+      <div class="ec-card">
+        <div class="ec-card-icon">🎨</div>
+        <div class="ec-card-title">Full design control</div>
+        <div class="ec-card-desc">Every pixel is customisable. Per-tenant themes via JSON config. Dark mode, custom fonts, Sapiant brand colours — impossible in embedded Power BI.</div>
+        <span class="ec-card-badge" style="background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.3);color:var(--accent3);">full control</span>
+      </div>
+      <div class="ec-card">
+        <div class="ec-card-icon">⚡</div>
+        <div class="ec-card-title">Canvas + SVG renderers</div>
+        <div class="ec-card-desc">SVG for sharp exports and accessibility. Canvas for high-performance with 100k+ data points. Switch per chart. Power BI only supports browser-controlled rendering.</div>
+        <span class="ec-card-badge" style="background:rgba(244,114,182,0.12);border:1px solid rgba(244,114,182,0.3);color:#f472b6;">performance</span>
+      </div>
+      <div class="ec-card">
+        <div class="ec-card-icon">🗺️</div>
+        <div class="ec-card-title">Rich chart types</div>
+        <div class="ec-card-desc">Bar, line, scatter, pie, heatmap, treemap, sunburst, sankey, graph, 3D charts, map/geo, candlestick, radar, gauge, calendar — 25+ chart types built in.</div>
+      </div>
+      <div class="ec-card">
+        <div class="ec-card-icon">🔗</div>
+        <div class="ec-card-title">Chart linking</div>
+        <div class="ec-card-desc">DataZoom, brush selection, and linked charts work natively. Select a date range on one chart and all others filter — replaces Power BI's cross-filter without Microsoft infrastructure.</div>
+        <span class="ec-card-badge" style="background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);color:var(--accent2);">interactivity</span>
+      </div>
+      <div class="ec-card">
+        <div class="ec-card-icon">📤</div>
+        <div class="ec-card-title">Client-side export</div>
+        <div class="ec-card-desc">Export any chart as PNG/SVG directly in the browser. ECharts returns a data URL — no server round-trip. PDF export via print CSS. No Power BI export queue.</div>
+      </div>
+      <div class="ec-card">
+        <div class="ec-card-icon">🧩</div>
+        <div class="ec-card-title">echarts-for-react</div>
+        <div class="ec-card-desc">Thin React wrapper. Declarative — just pass an <code style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent)">option</code> object. Handles mount/unmount lifecycle, resize observer, and event binding cleanly.</div>
+      </div>
+      <div class="ec-card">
+        <div class="ec-card-icon">🌐</div>
+        <div class="ec-card-title">SSR-compatible</div>
+        <div class="ec-card-desc">ECharts 5 supports server-side rendering to SVG strings — useful for email digest charts and PDF reports without a headless browser.</div>
+      </div>
+      <div class="ec-card">
+        <div class="ec-card-icon">♿</div>
+        <div class="ec-card-title">Accessibility</div>
+        <div class="ec-card-desc">Aria labels, keyboard navigation, and screen-reader descriptions built in (ECharts 5.3+). WCAG 2.1 AA achievable with configuration — ahead of embedded Power BI.</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);margin-bottom:16px;">ECharts option object — what the BFF sends to the browser</div>
+      <pre style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);line-height:1.7;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;overflow-x:auto;">{
+  <span style="color:var(--accent)">title</span>: { text: <span style="color:#fb923c">'Revenue by Region'</span>, textStyle: { color: <span style="color:#fb923c">'#e2e8f0'</span> } },
+  <span style="color:var(--accent)">tooltip</span>: { trigger: <span style="color:#fb923c">'axis'</span> },
+  <span style="color:var(--accent)">legend</span>: { data: [<span style="color:#fb923c">'Q1'</span>, <span style="color:#fb923c">'Q2'</span>, <span style="color:#fb923c">'Q3'</span>] },
+  <span style="color:var(--accent)">xAxis</span>: { type: <span style="color:#fb923c">'category'</span>, data: [<span style="color:#fb923c">'AU'</span>, <span style="color:#fb923c">'NZ'</span>, <span style="color:#fb923c">'SG'</span>, <span style="color:#fb923c">'UK'</span>] },
+  <span style="color:var(--accent)">yAxis</span>: { type: <span style="color:#fb923c">'value'</span> },
+  <span style="color:var(--accent)">series</span>: [
+    { name: <span style="color:#fb923c">'Q1'</span>, type: <span style="color:#fb923c">'bar'</span>, data: [120, 200, 150, 80] },
+    { name: <span style="color:#fb923c">'Q2'</span>, type: <span style="color:#fb923c">'bar'</span>, data: [180, 160, 200, 120] }
+  ]
+  <span style="color:var(--text-muted)">// ↑ Entire option shaped by BFF transform layer</span>
+  <span style="color:var(--text-muted)">// ↑ Tenant theme applied as ECharts registerTheme()</span>
+}</pre>
+    </div>
+
+    <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:18px;">
+      <div style="font-size:12px;font-weight:600;color:var(--accent5);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">⚠️ What ECharts does NOT replace</div>
+      <div style="font-size:13px;color:var(--text-dim);line-height:1.7;">Power BI includes a full <strong style="color:var(--text)">data modelling layer</strong> (DAX, relationships, calculated measures). ECharts is a rendering library only — it draws what you give it. You must bring your own query engine and aggregation pipeline. Plan B addresses this with the <strong style="color:var(--text)">Chart Data Service + Redshift</strong> as the compute backend. This is more work to build but gives you full query control, no black-box DAX behaviour, and no vendor lock-in on your data model.</div>
+    </div>
+  </div>
+
+  <!-- ══ COST CALCULATOR ══ -->
+  <div class="panel" id="panel-cost">
+    <div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);border-radius:10px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:20px;">📋</div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:3px;">Plan B cost model — Power BI eliminated</div>
+        <div style="font-size:13px;color:var(--text-dim);">No A-SKU licensing. Adds Redshift Serverless for analytics queries. BFF is a dedicated Fargate service. React SPA is static (S3/CloudFront — nearly free). Same auth + AI options as Plan A.</div>
+      </div>
+    </div>
+
+    <div class="cost-layout">
+      <div class="cost-controls">
+        <div class="cost-controls-title">⚙ Parameters</div>
+        <div class="control-group">
+          <div class="control-label">Tenants (launch → 12mo)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Launch <span class="control-value" id="lbl-tenants-launch">25</span></div>
+              <input type="range" min="1" max="200" value="25" id="sl-tenants-launch" oninput="recalc()">
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">12 months <span class="control-value" id="lbl-tenants-scale">100</span></div>
+              <input type="range" min="1" max="500" value="100" id="sl-tenants-scale" oninput="recalc()">
+            </div>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="control-label">Monthly Active Users <span class="control-value" id="lbl-mau">2000</span></div>
+          <input type="range" min="50" max="20000" value="2000" step="100" id="sl-mau" oninput="recalc()">
+        </div>
+        <div class="control-group">
+          <div class="control-label">Peak Concurrent Users <span class="control-value" id="lbl-concurrent">1000</span></div>
+          <input type="range" min="10" max="3000" value="1000" step="50" id="sl-concurrent" oninput="recalc()">
+        </div>
+        <div class="control-group">
+          <div class="control-label">Auth Provider</div>
+          <div class="control-options">
+            <button class="opt-btn active" id="opt-auth0" onclick="setAuth('auth0')">Auth0</button>
+            <button class="opt-btn" id="opt-azuread" onclick="setAuth('azuread')">Azure AD B2C</button>
+          </div>
+          <div id="auth-note" style="font-size:10px;color:var(--text-muted);margin-top:5px;"></div>
+        </div>
+        <div class="control-group">
+          <div class="control-label">AI Features</div>
+          <div class="control-options">
+            <button class="opt-btn active" id="opt-ai-off" onclick="setAI(false)">Off</button>
+            <button class="opt-btn" id="opt-ai-on" onclick="setAI(true)">On</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="control-label">Redshift Workload</div>
+          <div class="control-options">
+            <button class="opt-btn active" id="opt-rs-light" onclick="setRS('light')">Light</button>
+            <button class="opt-btn" id="opt-rs-med" onclick="setRS('medium')">Medium</button>
+            <button class="opt-btn" id="opt-rs-heavy" onclick="setRS('heavy')">Heavy</button>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:5px;" id="rs-note"></div>
+        </div>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+          <div class="control-options">
+            <button class="opt-btn active" id="opt-od" onclick="setRI(false)">On-demand</button>
+            <button class="opt-btn" id="opt-ri" onclick="setRI(true)">Reserved (1yr ~35% off)</button>
+          </div>
+        </div>
+        <div id="insight-box" style="margin-top:20px;padding:14px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--accent);"></div>
+      </div>
+
+      <div>
+        <div class="cost-summary">
+          <div class="cost-stat">
+            <div class="cost-stat-label">Launch /mo</div>
+            <div class="cost-stat-value" id="stat-launch">$0</div>
+            <div class="cost-stat-sub" id="stat-launch-sub">~25 tenants</div>
+          </div>
+          <div class="cost-stat warn">
+            <div class="cost-stat-label">12 Months /mo</div>
+            <div class="cost-stat-value" id="stat-scale">$0</div>
+            <div class="cost-stat-sub" id="stat-scale-sub">~100 tenants</div>
+          </div>
+          <div class="cost-stat highlight">
+            <div class="cost-stat-label">Year 1 Total</div>
+            <div class="cost-stat-value" id="stat-annual">$0</div>
+            <div class="cost-stat-sub">6mo launch + 6mo scale</div>
+          </div>
+        </div>
+
+        <div id="pbi-warning" style="margin-bottom:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;">Cost Breakdown by Category</div>
+          <div id="cost-bar-chart"></div>
+        </div>
+
+        <div class="cost-breakdown">
+          <div class="breakdown-header">
+            <div>Service</div><div>Tier</div><div>Launch /mo</div><div>Scale /mo</div><div></div>
+          </div>
+          <div id="breakdown-rows"></div>
+          <div class="cost-footer">
+            <div class="cf-label">Total</div><div></div>
+            <div class="cf-launch" id="footer-launch">$0</div>
+            <div class="cf-scale" id="footer-scale">$0</div>
+            <div></div>
+          </div>
+        </div>
+
+        <div class="cost-notes">
+          <div class="cost-notes-title">📌 Plan B cost characteristics</div>
+          <div class="cost-note"><div class="cost-note-dot" style="background:var(--accent)"></div><div class="cost-note-text"><strong style="color:var(--text)">No Power BI A-SKU — biggest saving.</strong> A2 was $1,470/mo in Plan A. Eliminated entirely in Plan B. That's ~$17,640/yr back. Your biggest cost lever is now Redshift, which scales with actual query volume rather than reserved capacity.</div></div>
+          <div class="cost-note"><div class="cost-note-dot" style="background:var(--accent3)"></div><div class="cost-note-text"><strong style="color:var(--text)">Redshift Serverless charges per RPU-hour.</strong> Light dashboards with pre-aggregated data: ~$50–150/mo. Heavy analytical dashboards with real-time queries against large datasets: $400–800/mo. Use Redis caching aggressively — the BFF cache is your primary cost control for analytics.</div></div>
+          <div class="cost-note"><div class="cost-note-dot" style="background:var(--accent4)"></div><div class="cost-note-text"><strong style="color:var(--text)">React SPA is essentially free to serve.</strong> S3 + CloudFront for a static bundle costs pennies per month regardless of user count. No Next.js SSR server means fewer Fargate tasks needed for the frontend path.</div></div>
+          <div class="cost-note"><div class="cost-note-dot" style="background:var(--accent2)"></div><div class="cost-note-text"><strong style="color:var(--text)">BFF is an additional Fargate service vs Plan A.</strong> Plan A had Next.js handle BFF duties. Plan B has a dedicated BFF service — adds ~$80–250/mo depending on load, but gives independent scaling and separation of concerns.</div></div>
+          <div class="cost-note"><div class="cost-note-dot" style="background:var(--accent5)"></div><div class="cost-note-text"><strong style="color:var(--text)">Hidden cost: build time.</strong> ECharts requires you to build and own the chart data pipeline. If Power BI reports are already built and working, Plan B requires significant dev investment to migrate — estimate 3–6 months of engineering time depending on complexity. Factor this into total cost of ownership.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TRADEOFFS ══ -->
+  <div class="panel" id="panel-tradeoffs">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px;line-height:1.6;">Plan B's specific trade-offs — the meaningful decisions in this architecture:</p>
+    <div class="tradeoff-grid">
+      <div class="tradeoff-card"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(0,229,160,0.1)">⚛️</div><div><div class="tradeoff-title">React SPA vs Next.js SSR</div><div class="tradeoff-subtitle">Client-side rendering vs server-side</div></div></div><div class="tradeoff-body">A pure SPA is simpler, cheaper to host, and decouples frontend completely. No server process means S3/CloudFront serving. Trade-off is first-load performance and SEO (less relevant for a B2B SaaS behind login).</div><div class="pro-con"><div class="pro"><div class="pro-title">Pros</div><ul><li>Static hosting (S3+CF)</li><li>Cheaper, simpler ops</li><li>True frontend/backend split</li></ul></div><div class="con"><div class="con-title">Cons</div><ul><li>Slower first paint (TTFB)</li><li>Client bundle larger</li><li>No server-side auth guard</li></ul></div></div></div>
+
+      <div class="tradeoff-card"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(245,158,11,0.1)">🚦</div><div><div class="tradeoff-title">Dedicated BFF vs co-located API routes</div><div class="tradeoff-subtitle">Independent service vs coupled</div></div></div><div class="tradeoff-body">A separate BFF service can be independently deployed, scaled, and monitored. Teams can also iterate on the BFF without touching backend services. But it's another service to manage.</div><div class="pro-con"><div class="pro"><div class="pro-title">Pros</div><ul><li>Independent scaling</li><li>Clear responsibility boundary</li><li>Separate deployments</li></ul></div><div class="con"><div class="con-title">Cons</div><ul><li>More services to operate</li><li>Additional network hop</li><li>More CI/CD pipelines</li></ul></div></div></div>
+
+      <div class="tradeoff-card"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(59,130,246,0.1)">📊</div><div><div class="tradeoff-title">ECharts vs Power BI</div><div class="tradeoff-subtitle">Build vs buy</div></div></div><div class="tradeoff-body">ECharts eliminates ~$18k+/yr in A-SKU licensing and gives full design control. But Power BI has a rich no-code report builder, DAX for complex measures, and stakeholders already know it. ECharts is a rendering library — you own the data pipeline.</div><div class="pro-con"><div class="pro"><div class="pro-title">ECharts</div><ul><li>Zero licensing cost</li><li>Full design control</li><li>No Microsoft dependency</li></ul></div><div class="con"><div class="con-title">Trade-off</div><ul><li>Must build data pipeline</li><li>No drag-drop report builder</li><li>3–6mo migration effort</li></ul></div></div></div>
+
+      <div class="tradeoff-card"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(251,146,60,0.1)">🏭</div><div><div class="tradeoff-title">Redshift vs PostgreSQL only</div><div class="tradeoff-subtitle">Analytical engine vs OLTP for everything</div></div></div><div class="tradeoff-body">Redshift Serverless handles analytical queries (aggregations over millions of rows) that would kill a transactional Postgres. But it adds complexity and cost. For simple dashboards, pre-aggregated Postgres views may be sufficient — postpone Redshift.</div><div class="pro-con"><div class="pro"><div class="pro-title">Redshift</div><ul><li>Fast analytical queries</li><li>Scales to huge datasets</li><li>Columnar = cheap scans</li></ul></div><div class="con"><div class="con-title">Postgres only</div><ul><li>Simpler architecture</li><li>Lower cost initially</li><li>Can start here, migrate later</li></ul></div></div></div>
+
+      <div class="tradeoff-card" style="grid-column:1/-1;"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(0,229,160,0.1)">🪜</div><div><div class="tradeoff-title">Migration Path — Incremental ECharts adoption</div><div class="tradeoff-subtitle">Replace report by report, not all at once</div></div></div><div class="tradeoff-body" style="margin-bottom:12px;">Don't replace all Power BI reports on day one. Run both in parallel using feature flags. Start with simple chart types, prove the pattern, then migrate report by report.</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;"><div style="background:var(--surface2);border-radius:6px;padding:11px;border-top:2px solid var(--accent)"><div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:3px;">Phase 1</div><div style="font-size:11px;color:var(--text-muted)">Build BFF + ECharts infra · One simple bar chart migrated</div></div><div style="background:var(--surface2);border-radius:6px;padding:11px;border-top:2px solid var(--accent2)"><div style="font-size:11px;font-weight:700;color:var(--accent2);margin-bottom:3px;">Phase 2</div><div style="font-size:11px;color:var(--text-muted)">Migrate high-traffic simple reports · Keep complex PBI reports</div></div><div style="background:var(--surface2);border-radius:6px;padding:11px;border-top:2px solid var(--accent3)"><div style="font-size:11px;font-weight:700;color:var(--accent3);margin-bottom:3px;">Phase 3</div><div style="font-size:11px;color:var(--text-muted)">Build complex chart types · Feature flag per tenant</div></div><div style="background:var(--surface2);border-radius:6px;padding:11px;border-top:2px solid var(--accent4)"><div style="font-size:11px;font-weight:700;color:var(--accent4);margin-bottom:3px;">Phase 4</div><div style="font-size:11px;color:var(--text-muted)">Decommission Power BI · 100% ECharts · A-SKU cancelled</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- ══ PLAN A vs B ══ -->
+  <div class="panel" id="panel-diff">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px;line-height:1.6;">Direct comparison of the two architectures across every meaningful dimension:</p>
+
+    <div class="diff-grid">
+      <div class="diff-card">
+        <div class="diff-card-header plan-a">📘 Plan A — Next.js + Power BI</div>
+        <div class="diff-card-body">
+          <div class="diff-row"><div class="diff-icon">⚛️</div><div><div class="diff-content-title">Next.js 14 (SSR + App Router)</div><div class="diff-content-sub">Frontend + BFF co-located · SSR for fast first load · Server Components for auth-protected pages</div></div></div>
+          <div class="diff-row"><div class="diff-icon">🚦</div><div><div class="diff-content-title">BFF via Next.js API Routes</div><div class="diff-content-sub">BFF bundled with frontend · Shared Fargate tasks · Can't scale independently</div></div></div>
+          <div class="diff-row"><div class="diff-icon">📊</div><div><div class="diff-content-title">Power BI Embedded (A-SKU)</div><div class="diff-content-sub">A2 recommended at your scale · $1,470/mo · ~600 concurrent renders · Microsoft infra</div></div></div>
+          <div class="diff-row"><div class="diff-icon">🔑</div><div><div class="diff-content-title">Embed Token Service</div><div class="diff-content-sub">Service principal + Azure AD · Token gen + Redis cache · Complex auth flow</div></div></div>
+          <div class="diff-row"><div class="diff-icon">☁️</div><div><div class="diff-content-title">AWS + Azure (dual cloud)</div><div class="diff-content-sub">Power BI is Azure · Everything else is AWS · Cross-cloud latency + two billing relationships</div></div></div>
+          <div class="diff-row"><div class="diff-icon">🗄️</div><div><div class="diff-content-title">PostgreSQL + Redis + S3</div><div class="diff-content-sub">Standard data layer · Data modelling done inside Power BI DAX</div></div></div>
+        </div>
+      </div>
+      <div class="diff-card">
+        <div class="diff-card-header plan-b">📗 Plan B — React SPA + ECharts</div>
+        <div class="diff-card-body">
+          <div class="diff-row"><div class="diff-icon">⚛️</div><div><div class="diff-content-title">React 18 SPA (Vite + React Router)</div><div class="diff-content-sub">Static bundle served from S3/CloudFront · Client-side rendering · Thin client, no server</div></div></div>
+          <div class="diff-row"><div class="diff-icon">🚦</div><div><div class="diff-content-title">BFF as dedicated Fastify service</div><div class="diff-content-sub">Independent ECS Fargate service · Own scaling policy · Owns ECharts data transform</div></div></div>
+          <div class="diff-row"><div class="diff-icon">📊</div><div><div class="diff-content-title">Apache ECharts (open source)</div><div class="diff-content-sub">$0 licensing · 25+ chart types · Full design control · Canvas + SVG renderers</div></div></div>
+          <div class="diff-row"><div class="diff-icon">🔑</div><div><div class="diff-content-title">No embed token flow</div><div class="diff-content-sub">Charts just render data from BFF · Standard JWT auth · No Azure AD service principal needed</div></div></div>
+          <div class="diff-row"><div class="diff-icon">☁️</div><div><div class="diff-content-title">AWS only (100%)</div><div class="diff-content-sub">No Azure dependency · Single cloud billing · Simpler ops · No cross-cloud latency</div></div></div>
+          <div class="diff-row"><div class="diff-icon">🗄️</div><div><div class="diff-content-title">PostgreSQL + Redshift + Redis + S3</div><div class="diff-content-sub">Redshift Serverless for analytical queries · You own the data pipeline and query logic</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="diff-outcome">
+      <div class="diff-outcome-title">Head-to-head comparison</div>
+      <div class="outcome-row" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;padding-bottom:6px;">
+        <div></div><div>Plan A</div><div>Plan B</div>
+      </div>
+      <div class="outcome-row"><div class="outcome-label">Monthly cost (at scale)</div><div class="outcome-cell worse">~$3,200–4,500</div><div class="outcome-cell better">~$1,800–2,800 ✓</div></div>
+      <div class="outcome-row"><div class="outcome-label">Year 1 total cost</div><div class="outcome-cell worse">~$35,000–50,000</div><div class="outcome-cell better">~$20,000–32,000 ✓</div></div>
+      <div class="outcome-row"><div class="outcome-label">Time to first working report</div><div class="outcome-cell better">3–4 weeks ✓</div><div class="outcome-cell worse">6–10 weeks</div></div>
+      <div class="outcome-row"><div class="outcome-label">Build complexity</div><div class="outcome-cell better">Lower ✓</div><div class="outcome-cell worse">Higher (data pipeline)</div></div>
+      <div class="outcome-row"><div class="outcome-label">Design + UI control</div><div class="outcome-cell worse">Limited (Power BI iframe)</div><div class="outcome-cell better">Full control ✓</div></div>
+      <div class="outcome-row"><div class="outcome-label">Microsoft dependency</div><div class="outcome-cell worse">High (PBI + Azure AD)</div><div class="outcome-cell better">None ✓</div></div>
+      <div class="outcome-row"><div class="outcome-label">Chart export quality</div><div class="outcome-cell neutral">Power BI built-in</div><div class="outcome-cell better">PNG/SVG/PDF, client-side ✓</div></div>
+      <div class="outcome-row"><div class="outcome-label">Analytical query speed</div><div class="outcome-cell better">Fast (PBI dataset cache)</div><div class="outcome-cell neutral">Depends on Redis + Redshift</div></div>
+      <div class="outcome-row"><div class="outcome-label">Frontend deployment</div><div class="outcome-cell neutral">ECS Fargate (Next.js server)</div><div class="outcome-cell better">S3 + CloudFront (static) ✓</div></div>
+      <div class="outcome-row"><div class="outcome-label">Backend for frontend scaling</div><div class="outcome-cell neutral">Tied to frontend deploy</div><div class="outcome-cell better">Independent service ✓</div></div>
+      <div class="outcome-row"><div class="outcome-label">Long-term flexibility</div><div class="outcome-cell neutral">Good (but PBI lock-in)</div><div class="outcome-cell better">Maximum ✓</div></div>
+      <div class="outcome-row"><div class="outcome-label">Existing PBI report migration</div><div class="outcome-cell better">Zero work (keep as-is) ✓</div><div class="outcome-cell worse">Full rebuild per report</div></div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--accent4);border-radius:10px;padding:20px;">
+      <div style="font-size:13px;font-weight:700;color:var(--accent4);margin-bottom:10px;">📌 Recommendation: which plan?</div>
+      <div style="font-size:13px;color:var(--text-dim);line-height:1.7;">
+        <strong style="color:var(--text)">Choose Plan A if:</strong> you have existing Power BI reports you want to keep, your stakeholders are already familiar with PBI's look, and you want the fastest possible time to market. Next.js + PBI is battle-tested and gets you to production in weeks.<br><br>
+        <strong style="color:var(--text)">Choose Plan B if:</strong> the $1,500+/mo PBI A-SKU is a pain point, you want complete UI control (brand consistency across the whole product, not just around an iframe), your team is comfortable building a data query layer, or you're planning to grow to a scale where the PBI cost becomes significant ($3k+/mo).<br><br>
+        <strong style="color:var(--accent)">Hybrid approach:</strong> Launch with Plan A (Next.js + PBI) to get to market fast. Run Plan B development in parallel. Migrate reports to ECharts incrementally using feature flags. Decommission PBI once all reports are migrated. This maximises speed-to-market while achieving Plan B's long-term cost structure.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="backdrop" id="backdrop" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detail-panel">
+  <button class="detail-close" onclick="closeDetail()">✕ close</button>
+  <div id="detail-content"></div>
+</div>
+
+<script>
+function showPanel(name,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  if(btn)btn.classList.add('active');
+}
+
+const details={
+  react:{tag:'Client Tier',title:'React 18 SPA',desc:'A pure client-side React application built with Vite, served as a static bundle from S3/CloudFront. No server-side Node process for the frontend — just HTML, JS, and CSS files.',points:['Vite for instant HMR and optimised production builds','React Router v7 for client-side routing with nested layouts','TanStack Query (React Query) for server state, caching, and background refetch','TypeScript throughout — tenant and role types enforced at compile time','Code splitting per route — users only load JS for the current page'],tech:['React 18','Vite','TypeScript','React Router v7','TanStack Query'],techColor:'green'},
+  'echarts-client':{tag:'Client Tier',title:'Apache ECharts',desc:'Open-source visualisation library replacing Power BI. Renders charts entirely in the browser using SVG or Canvas. The BFF sends ready-to-render ECharts option objects.',points:['echarts-for-react: thin React wrapper, declarative option prop','25+ chart types: bar, line, scatter, pie, heatmap, treemap, sankey, geo, 3D','Per-tenant themes registered via echarts.registerTheme() on boot','SVG renderer for exports and accessibility; Canvas for high-data-volume charts','DataZoom and brush selection for cross-chart filtering (replaces PBI cross-filter)','Client-side PNG/SVG export — no server round-trip'],tech:['Apache ECharts 5','echarts-for-react','SVG/Canvas','registerTheme'],techColor:'green'},
+  ui:{tag:'Client Tier',title:'Design System',desc:'Same component library as Plan A. Tailwind + shadcn/ui + Radix primitives. Since we control the entire UI (no Power BI iframe), the design system can be applied consistently everywhere.',points:['Tailwind CSS — tenant branding via CSS custom properties at root level','shadcn/ui + Radix for accessible, unstyled primitives','Framer Motion for chart transitions and dashboard animations','ECharts theme JSON keeps chart style in sync with design system colours'],tech:['Tailwind CSS','shadcn/ui','Radix UI','Framer Motion'],techColor:'green'},
+  state:{tag:'Client Tier',title:'Client State Management',desc:'Plan B has an explicit client state layer since there is no Next.js server to handle state server-side. TanStack Query handles all server state; Zustand for global UI state.',points:['TanStack Query: chart data, user profile, tenant config — all server state','Stale-while-revalidate: charts show cached data, refresh in background','Zustand: UI state only (sidebar open, active dashboard, theme preference)','React Context: auth state only — user, tenantId, roles','No Redux — too heavy for this use case'],tech:['TanStack Query','Zustand','React Context'],techColor:'green'},
+  auth0:{tag:'Identity',title:'Auth0 / Azure AD B2C',desc:'Same identity provider as Plan A. OIDC + OAuth 2.0. In Plan B, the callback redirects to the React SPA directly — no Next.js server handles the callback.',points:['OIDC callback handled by React Router in the SPA','JWT stored in httpOnly cookie via a thin /auth/callback endpoint on the BFF','Subsequent API calls carry the cookie automatically','MFA, SSO, enterprise IdP connectors unchanged from Plan A'],tech:['Auth0','OIDC','OAuth 2.0','PKCE flow'],techColor:'purple'},
+  rbac:{tag:'Identity',title:'RBAC + Tenant Context',desc:'Roles and tenant ID travel in the JWT. The BFF validates and enforces these on every request. Backend services trust the BFF-stamped headers rather than re-validating the JWT themselves.',points:['JWT contains: sub, email, tenantId, roles[]','BFF stamps internal headers: x-tenant-id, x-user-id, x-roles','Backend services only accept calls from the BFF on internal network','Tenant data isolation enforced at BFF + DB layer'],tech:['JWT Claims','RBAC','Internal headers'],techColor:'purple'},
+  session:{tag:'Identity',title:'Session Management',desc:'Identical to Plan A. Short-lived JWTs in httpOnly cookies, refresh via BFF /auth/refresh endpoint. No change from Plan A here.',points:['Access token: 15 min · Refresh token: 7 days, rotated on use','Silent refresh triggered by TanStack Query interceptor before expiry','httpOnly, Secure, SameSite=Strict — XSS immune','BFF owns /auth/refresh — frontend never touches refresh tokens directly'],tech:['httpOnly Cookies','JWT RS256','Refresh Token Rotation'],techColor:'purple'},
+  'bff-gateway':{tag:'BFF Layer',title:'BFF Gateway',desc:'The BFF is a dedicated Fastify service — not co-located with the frontend. It is the only service the React SPA talks to. It aggregates calls to backend services and owns the ECharts transform layer.',points:['Single entry point for all SPA requests','Request aggregation: /bff/bootstrap returns tenant+user+nav in one call','Fastify plugins: helmet, cors, rate-limit, compress','Routes map to backend service calls — often fan-out then merge'],tech:['Fastify','Node.js','TypeScript','ECS Fargate'],techColor:'amber'},
+  'bff-auth':{tag:'BFF Layer',title:'Auth Middleware',desc:'JWT validation happens here — once, at the BFF boundary. All downstream services trust the BFF and receive tenant context via internal headers.',points:['RS256 JWT validation on every request (JWKS cached locally)','Extracts tenantId, userId, roles — attaches to request context','All backend calls stamped with x-tenant-id, x-user-id headers','CORS config: only the SPA origin is whitelisted','Audit log written on every request with latency, user, action'],tech:['Fastify Hooks','JWKS Cache','Helmet.js'],techColor:'amber'},
+  'bff-cache':{tag:'BFF Layer',title:'Response Cache',desc:'Redis-backed caching at the BFF layer for chart data responses. This is the primary cost-control mechanism for Redshift — a cache hit avoids the query entirely.',points:['Cache key: chart:data:{tenantId}:{chartId}:{params-hash}','TTL configurable per chart type: 30s for live metrics, 30min for daily aggregates','Cache-Control headers sent to client — TanStack Query respects them','Cache invalidation: on data refresh webhook or admin manual clear','Tenant-scoped — one tenant cache miss never triggers another\'s data'],tech:['Redis','ioredis','TTL strategy'],techColor:'amber'},
+  'bff-transform':{tag:'BFF Layer',title:'Data Transform Layer',desc:'The most unique BFF responsibility in Plan B. Raw rows from the Chart Data Service are transformed into valid ECharts option objects. The browser just calls setOption().',points:['Transform library: one function per chart type (bar, line, pie, heatmap, etc.)','Input: { columns, rows, chartConfig }','Output: valid ECharts option object with tenant theme applied','Shared server-side — transformers are unit-testable without a browser','Custom chart configs stored in Postgres as JSON — BFF loads them at request time'],tech:['ECharts option schema','Transform library','TypeScript'],techColor:'amber'},
+  api:{tag:'Backend',title:'Core API',desc:'Identical to Plan A. Handles user management, tenant CRUD, navigation trees, and app configuration. No changes from Plan A here.',points:['Fastify REST API · Node.js · TypeScript','User management, tenant config, navigation trees','Feature flags, branding config, report-to-page mappings','Listens only on internal VPC network — not publicly reachable'],tech:['Node.js','Fastify','Drizzle ORM','Zod'],techColor:'blue'},
+  'chart-data':{tag:'Backend',title:'Chart Data Service',desc:'New in Plan B. Replaces the Power BI dataset layer. Handles all analytical queries against PostgreSQL and Redshift, with tenant isolation enforced at the query level.',points:['Accepts: { tenantId, chartId, filters, dateRange } from BFF','Resolves chart definition from Postgres (what metrics, what dimensions)','Executes tenant-scoped query against Redshift or Postgres','Returns: { columns, rows } — the BFF then transforms to ECharts format','Pre-aggregated rollup tables in Postgres for fast common queries','Falls through to Redshift only for queries not covered by rollups'],tech:['Node.js','Fastify','Redshift SDK','Drizzle ORM'],techColor:'blue'},
+  'tenant-service':{tag:'Backend',title:'Tenant Service',desc:'Same as Plan A plus dashboard layout management. Stores ECharts dashboard configurations (which charts, which positions, which filters) per tenant.',points:['Tenant CRUD: branding, domains, features','Navigation tree management per tenant','Dashboard layouts: JSON config of which ECharts charts appear where','Chart configurations: type, data source mapping, display options','Cached in Redis — no DB hit on page load'],tech:['PostgreSQL','Redis','JSON config schema'],techColor:'blue'},
+  'ai-service':{tag:'Backend',title:'AI / Analytics Service',desc:'Same as Plan A. NL-to-SQL, insights, anomaly detection. In Plan B, the AI service can generate ECharts options directly from NL queries.',points:['NL to tenant-scoped SQL — generates safe, read-only queries','AI-generated ECharts option objects from NL: "show me revenue by region as a map"','Anomaly detection on time-series data from Redshift','Streamed responses via SSE for progressive chart rendering'],tech:['OpenAI API','Anthropic API','LangChain'],techColor:'blue'},
+  postgres:{tag:'Data Layer',title:'PostgreSQL',desc:'Same as Plan A, plus it now stores ECharts dashboard and chart configurations as JSONB columns. Also stores pre-aggregated rollup tables for fast chart queries.',points:['All tables include tenantId foreign key + Postgres RLS','Stores: tenants, users, roles, nav trees, dashboard layouts, chart configs','JSONB columns for ECharts option overrides per tenant','Pre-aggregated rollup tables (materialized views + pg_cron refreshes)','Read replica for analytics queries'],tech:['PostgreSQL 16','Postgres RLS','JSONB','PgBouncer'],techColor:'amber'},
+  warehouse:{tag:'Data Layer',title:'Data Warehouse (Redshift Serverless)',desc:'New in Plan B. Handles analytical queries that would be too slow on transactional PostgreSQL. Charged per query volume (RPU-hours) — no reserved capacity.',points:['Redshift Serverless: pay per RPU-hour, no reserved cluster needed','Handles: aggregations over millions of rows, complex joins, time-series rollups','Primary data: operational events, metrics, transaction data loaded via ETL','Redis caching in front — most requests never hit Redshift','Start with Postgres materialised views; migrate to Redshift only when needed'],tech:['Amazon Redshift Serverless','RPU pricing','Spectrum for S3 data'],techColor:'amber'},
+  redis:{tag:'Data Layer',title:'Redis',desc:'Larger role in Plan B vs Plan A. In Plan A, Redis mainly cached PBI embed tokens. In Plan B, Redis is the primary cost-control mechanism for Redshift — heavy chart data caching.',points:['Chart data cache: 30s–30min TTL per chart type (biggest usage)','Dashboard config cache: nav trees, chart layouts per tenant','Session cache: JWT refresh tokens','Rate limit counters: sliding window per tenant/endpoint'],tech:['Redis 7','ioredis','ElastiCache Cluster'],techColor:'amber'},
+  blob:{tag:'Data Layer',title:'Blob Storage',desc:'S3 in Plan B also hosts the React SPA static build artifacts (in addition to tenant assets). Chart PNG exports are generated client-side and optionally uploaded to S3 for sharing.',points:['SPA hosting bucket: React build → CloudFront distribution','Tenant assets: logos, custom CSS themes','Chart exports: PNG/SVG uploaded by client, signed URL returned for sharing','Dashboard snapshots for email digests (ECharts SSR to SVG)'],tech:['S3','CloudFront','Pre-signed URLs'],techColor:'amber'}
+};
+
+function showDetail(key){
+  const d=details[key];if(!d)return;
+  const tc=d.techColor||'green';
+  document.getElementById('detail-content').innerHTML=`
+    <div class="detail-tag">${d.tag}</div>
+    <div class="detail-title">${d.title}</div>
+    <div class="detail-desc">${d.desc}</div>
+    <div class="detail-section"><div class="detail-section-title">Key Points</div>${d.points.map(p=>`<div class="detail-item"><div class="detail-item-dot"></div><div class="detail-item-text">${p}</div></div>`).join('')}</div>
+    <div class="detail-section"><div class="detail-section-title">Technologies</div><div class="detail-tech">${d.tech.map(t=>`<span class="tech-badge ${tc}">${t}</span>`).join('')}</div></div>`;
+  document.getElementById('detail-panel').classList.add('open');
+  document.getElementById('backdrop').classList.add('open');
+}
+function closeDetail(){document.getElementById('detail-panel').classList.remove('open');document.getElementById('backdrop').classList.remove('open');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail();});
+
+// ── COST CALCULATOR ──
+let authProvider='auth0', aiEnabled=false, riEnabled=false, rsWorkload='light';
+
+function setAuth(p){authProvider=p;document.getElementById('opt-auth0').classList.toggle('active',p==='auth0');document.getElementById('opt-azuread').classList.toggle('active',p==='azuread');recalc();}
+function setAI(on){aiEnabled=on;document.getElementById('opt-ai-off').classList.toggle('active',!on);document.getElementById('opt-ai-on').classList.toggle('active',on);recalc();}
+function setRI(on){riEnabled=on;document.getElementById('opt-od').classList.toggle('active',!on);document.getElementById('opt-ri').classList.toggle('active',on);recalc();}
+function setRS(w){rsWorkload=w;['light','medium','heavy'].forEach(k=>document.getElementById('opt-rs-'+k).classList.toggle('active',k===w));recalc();}
+function fmt(n){return'$'+Math.round(n).toLocaleString();}
+
+const rsNotes={light:'Pre-aggregated rollups, simple charts. ~$50–150/mo.',medium:'Mix of real-time and historical queries. ~$200–400/mo.',heavy:'Complex analytical dashboards, large datasets. ~$500–900/mo.'};
+const rsCosts={launch:{light:80,medium:180,heavy:350},scale:{light:150,medium:380,heavy:750}};
+
+function recalc(){
+  const tenantsLaunch=parseInt(document.getElementById('sl-tenants-launch').value);
+  const tenantsScale=parseInt(document.getElementById('sl-tenants-scale').value);
+  const mau=parseInt(document.getElementById('sl-mau').value);
+  const concurrent=parseInt(document.getElementById('sl-concurrent').value);
+
+  document.getElementById('lbl-tenants-launch').textContent=tenantsLaunch;
+  document.getElementById('lbl-tenants-scale').textContent=tenantsScale;
+  document.getElementById('lbl-mau').textContent=mau.toLocaleString();
+  document.getElementById('lbl-concurrent').textContent=concurrent;
+  document.getElementById('rs-note').textContent=rsNotes[rsWorkload];
+
+  const ri=riEnabled?0.65:1.0;
+
+  // Auth
+  let authL,authS,authName;
+  if(authProvider==='auth0'){
+    authL=Math.max(0,(mau-7500)*0.0023);
+    authS=Math.max(0,(mau*2-7500)*0.0023);
+    authName='Auth0';
+    document.getElementById('auth-note').textContent=`Auth0: ${mau<=7500?'within free tier (7,500 MAU) ✓':'paid, ~'+fmt((mau-7500)*0.0023)+'/mo'}`;
+  } else {
+    authL=Math.max(0,(mau-50000)*0.00016);
+    authS=Math.max(0,(mau*2-50000)*0.00016);
+    authName='Azure AD B2C';
+    document.getElementById('auth-note').textContent=`Azure AD B2C: ${mau<=50000?'within free tier (50k MAU) ✓':'paid, ~'+fmt((mau-50000)*0.00016)+'/mo'}`;
+  }
+
+  // Fargate: BFF + Core API + Chart Data Service (3 services now)
+  const taskHr=(0.5*0.04856)+(1*0.00532);
+  const bffTasksL=4, bffTasksS=Math.max(6,Math.ceil(concurrent/100)*2);
+  const apiTasksL=4, apiTasksS=Math.max(6,Math.ceil(concurrent/150)*2);
+  const chartTasksL=4, chartTasksS=Math.max(6,Math.ceil(concurrent/80)*2); // chart service is more CPU
+  const chartTaskHr=(1*0.04856)+(2*0.00532); // chart data service: 1 vCPU / 2GB
+
+  const bffL=taskHr*bffTasksL*730*ri;
+  const bffS=taskHr*bffTasksS*730*ri;
+  const apiL=taskHr*apiTasksL*730*ri;
+  const apiS=taskHr*apiTasksS*730*ri;
+  const chartFarL=chartTaskHr*chartTasksL*730*ri;
+  const chartFarS=chartTaskHr*chartTasksS*730*ri;
+
+  const rdsL=67*2*ri;
+  const rdsS=(tenantsScale>100?134:67)*2*ri;
+  const redisL=13.9*2;
+  const redisS=13.9*(concurrent>800?4:3);
+  const cfL=5, cfS=Math.round(5+mau*0.003);
+  const albL=18, albS=Math.round(16+concurrent*0.04);
+  const wafL=12, wafS=Math.round(12+tenantsScale*0.15);
+  const s3L=3, s3S=Math.round(3+tenantsScale*0.1);
+  const cwL=15, cwS=Math.round(15+tenantsScale*0.5);
+
+  const rsL=rsCosts.launch[rsWorkload];
+  const rsS=rsCosts.scale[rsWorkload];
+
+  const services=[
+    {icon:'🌐',name:'CloudFront CDN + S3 (SPA)',desc:'Static React bundle · Near-zero frontend hosting',tier:'Managed',launch:cfL+s3L,scale:cfS+s3S},
+    {icon:'🛡️',name:'AWS WAF',desc:'Web application firewall',tier:'Managed',launch:wafL,scale:wafS},
+    {icon:'⚖️',name:'ALB (API traffic only)',desc:'Multi-AZ · No SSR traffic',tier:'Multi-AZ',launch:albL,scale:albS},
+    {icon:'🚦',name:'BFF Service (ECS Fargate)',desc:`${bffTasksL} tasks → ${bffTasksS} tasks · Fastify BFF`,tier:'Auto-scale',launch:bffL,scale:bffS},
+    {icon:'⚙️',name:'Core API Service (ECS Fargate)',desc:`${apiTasksL} tasks → ${apiTasksS} tasks · Business logic`,tier:'Auto-scale',launch:apiL,scale:apiS},
+    {icon:'📈',name:'Chart Data Service (ECS Fargate)',desc:`${chartTasksL} tasks → ${chartTasksS} tasks · 1vCPU/2GB`,tier:'Auto-scale',launch:chartFarL,scale:chartFarS},
+    {icon:'🐘',name:'RDS PostgreSQL',desc:'db.t4g.medium · Multi-AZ · App + config data',tier:'Multi-AZ',launch:rdsL,scale:rdsS},
+    {icon:'🏭',name:'Redshift Serverless',desc:`${rsNotes[rsWorkload].split('.')[0]} · RPU-hour billing`,tier:'Serverless',launch:rsL,scale:rsS},
+    {icon:'⚡',name:'ElastiCache Redis',desc:'Chart cache · Sessions · Rate limits',tier:'Clustered',launch:redisL,scale:redisS},
+    {icon:'🔒',name:'Secrets Manager',desc:'DB creds · API keys · Auto-rotation',tier:'Managed',launch:8,scale:12},
+    {icon:'📡',name:'CloudWatch',desc:'Logs · metrics · alarms',tier:'Managed',launch:cwL,scale:cwS},
+    {icon:'🔐',name:authName,desc:`${mau.toLocaleString()} → ${(mau*2).toLocaleString()} MAU`,tier:'SaaS',launch:authL,scale:authS},
+  ];
+  if(aiEnabled)services.push({icon:'🤖',name:'AI API (OpenAI/Anthropic)',desc:`~${mau.toLocaleString()} users`,tier:'SaaS',launch:mau*0.025,scale:mau*0.06});
+
+  const totalLaunch=services.reduce((s,r)=>s+r.launch,0);
+  const totalScale=services.reduce((s,r)=>s+r.scale,0);
+  const maxVal=Math.max(...services.map(r=>r.scale),1);
+
+  document.getElementById('breakdown-rows').innerHTML=services.map(r=>`
+    <div class="breakdown-row">
+      <div class="br-service"><div class="br-icon">${r.icon}</div><div><div class="br-name">${r.name}</div><div class="br-desc">${r.desc}</div></div></div>
+      <div class="br-tier">${r.tier}</div>
+      <div class="br-launch">${fmt(r.launch)}</div>
+      <div class="br-scale">${fmt(r.scale)}</div>
+      <div><div class="br-bar-inner" style="width:${Math.round(r.scale/maxVal*100)}%;background:${r.name.includes('Redshift')?'var(--accent4)':r.tier==='SaaS'?'var(--accent2)':r.name.includes('Chart')?'#f472b6':'var(--accent)'}"></div></div>
+    </div>`).join('');
+
+  document.getElementById('footer-launch').textContent=fmt(totalLaunch);
+  document.getElementById('footer-scale').textContent=fmt(totalScale);
+  document.getElementById('stat-launch').textContent=fmt(totalLaunch);
+  document.getElementById('stat-scale').textContent=fmt(totalScale);
+  document.getElementById('stat-annual').textContent=fmt(totalLaunch*6+totalScale*6);
+  document.getElementById('stat-launch-sub').textContent=`~${tenantsLaunch} tenants`;
+  document.getElementById('stat-scale-sub').textContent=`~${tenantsScale} tenants`;
+
+  const rsPct=Math.round((rsS/totalScale)*100);
+  const saving=Math.round((1470-rsS)); // saving vs PBI A2
+  document.getElementById('insight-box').innerHTML=`
+    <div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:6px;">💡 Key insight</div>
+    <div style="font-size:11px;color:var(--text-dim);line-height:1.6;">
+      Redshift is <strong style="color:var(--text)">${rsPct}% of scale cost</strong> — your new biggest lever (was Power BI A-SKU in Plan A).
+      ${saving>0?`Saving ~<strong style="color:var(--accent)">${fmt(saving)}/mo</strong> vs PBI A2 on analytics capacity.`:'Redshift cost exceeds PBI A2 — consider more aggressive caching or lighter queries.'}
+      ${!riEnabled?' Switching compute to Reserved Instances saves ~'+fmt(Math.round(totalScale*0.1))+'/mo.':'Reserved Instances applied.'}
+    </div>`;
+
+  // Bar chart
+  const computeVal=services.filter(s=>s.name.includes('Fargate')).reduce((a,s)=>a+s.scale,0);
+  const dataVal=services.filter(s=>s.name.includes('PostgreSQL')||s.name.includes('Redis')).reduce((a,s)=>a+s.scale,0);
+  const authVal=services.find(s=>s.name.includes('Auth'))?.scale||0;
+  const rsVal=rsS;
+  const otherVal=Math.max(0,totalScale-computeVal-dataVal-authVal-rsVal);
+  const categories=[
+    {label:'Compute',val:computeVal,color:'var(--accent)'},
+    {label:'Redshift',val:rsVal,color:'var(--accent4)'},
+    {label:'Database',val:dataVal,color:'#fb923c'},
+    {label:'Auth',val:authVal,color:'var(--accent2)'},
+    {label:'Other',val:otherVal,color:'var(--text-muted)'},
+  ];
+  document.getElementById('cost-bar-chart').innerHTML=categories.map(c=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;">
+      <div style="width:70px;font-size:10px;color:var(--text-muted);text-align:right;font-family:'IBM Plex Mono',monospace;">${c.label}</div>
+      <div style="flex:1;height:16px;background:var(--surface2);border-radius:3px;overflow:hidden;">
+        <div style="width:${Math.round(c.val/totalScale*100)}%;height:100%;background:${c.color};border-radius:3px;transition:width 0.4s ease;"></div>
+      </div>
+      <div style="width:55px;font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;">${fmt(c.val)} <span style="color:var(--text-muted);font-size:9px;">${Math.round(c.val/totalScale*100)}%</span></div>
+    </div>`).join('');
+}
+
+recalc();
+</script>
+</body>
+</html>
