@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI DevOps Pipeline - 4 Agent Architecture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; padding: 40px 20px; }
+  h1 { text-align: center; font-size: 1.6rem; margin-bottom: 6px; color: #f0f6fc; }
+  .subtitle { text-align: center; color: #8b949e; margin-bottom: 40px; font-size: 0.9rem; }
+
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .agent-block {
+    border-radius: 12px;
+    padding: 24px 28px;
+    position: relative;
+  }
+
+  .agent-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .agent-icon {
+    width: 46px; height: 46px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+  }
+
+  .agent-meta { flex: 1; }
+  .agent-number { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; }
+  .agent-name { font-size: 1.1rem; font-weight: 700; }
+
+  .agent-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .section-label {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
+    opacity: 0.5; margin-bottom: 6px;
+  }
+
+  .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 0.78rem;
+  }
+
+  /* Arrow between agents */
+  .arrow-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 6px 0;
+  }
+  .arrow-line { width: 2px; height: 20px; background: #30363d; }
+  .arrow-head {
+    width: 0; height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 10px solid #30363d;
+  }
+  .arrow-label {
+    font-size: 0.72rem; color: #8b949e;
+    margin: 4px 0 0;
+  }
+
+  /* Self-heal loop */
+  .selfheal {
+    max-width: 900px; margin: 0 auto;
+    margin-top: 0;
+  }
+  .selfheal-box {
+    background: rgba(248,81,73,0.08);
+    border: 1px dashed rgba(248,81,73,0.35);
+    border-radius: 12px;
+    padding: 16px 24px;
+    display: flex; align-items: center; gap: 14px;
+    margin-top: 0;
+  }
+  .selfheal-icon { font-size: 1.5rem; }
+  .selfheal-text h3 { font-size: 0.95rem; color: #f85149; margin-bottom: 4px; }
+  .selfheal-text p { font-size: 0.82rem; color: #8b949e; }
+
+  /* Colors per agent */
+  .a1 { background: rgba(88,166,255,0.06); border: 1px solid rgba(88,166,255,0.2); }
+  .a1 .agent-icon { background: rgba(88,166,255,0.15); }
+  .a1 .agent-name { color: #58a6ff; }
+
+  .a2 { background: rgba(63,185,80,0.06); border: 1px solid rgba(63,185,80,0.2); }
+  .a2 .agent-icon { background: rgba(63,185,80,0.15); }
+  .a2 .agent-name { color: #3fb950; }
+
+  .a3 { background: rgba(210,153,34,0.06); border: 1px solid rgba(210,153,34,0.2); }
+  .a3 .agent-icon { background: rgba(210,153,34,0.15); }
+  .a3 .agent-name { color: #d2a21f; }
+
+  .a4 { background: rgba(163,113,247,0.06); border: 1px solid rgba(163,113,247,0.2); }
+  .a4 .agent-icon { background: rgba(163,113,247,0.15); }
+  .a4 .agent-name { color: #a371f7; }
+
+  .trigger-box {
+    max-width: 900px; margin: 0 auto 0;
+    background: rgba(255,255,255,0.03);
+    border: 1px dashed rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 14px 20px;
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 0;
+  }
+  .trigger-box .t-icon { font-size: 1.4rem; }
+  .trigger-box h3 { font-size: 0.88rem; color: #e6edf3; margin-bottom: 2px; }
+  .trigger-box p { font-size: 0.78rem; color: #8b949e; }
+
+  .tools-row { margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<h1>🤖 AI-Powered DevOps Pipeline</h1>
+<p class="subtitle">4-Agent Autonomous System — Feature to Production</p>
+
+<div class="pipeline">
+
+  <!-- TRIGGER -->
+  <div class="trigger-box">
+    <div class="t-icon">📥</div>
+    <div>
+      <h3>Feature Input Trigger</h3>
+      <p>Jira ticket / GitHub issue / Slack command / Product spec → kicks off the pipeline</p>
+    </div>
+  </div>
+
+  <div class="arrow-wrap">
+    <div class="arrow-line"></div>
+    <div class="arrow-head"></div>
+    <div class="arrow-label">feature spec ingested</div>
+  </div>
+
+  <!-- AGENT 1 -->
+  <div class="agent-block a1">
+    <div class="agent-header">
+      <div class="agent-icon">🧠</div>
+      <div class="agent-meta">
+        <div class="agent-number">Agent 1</div>
+        <div class="agent-name">Feature Analyst Agent</div>
+      </div>
+    </div>
+    <div class="agent-body">
+      <div>
+        <div class="section-label">Responsibilities</div>
+        <div class="tag-list">
+          <span class="tag">Parse feature spec</span>
+          <span class="tag">Break into tasks</span>
+          <span class="tag">Identify affected services</span>
+          <span class="tag">Generate technical design</span>
+          <span class="tag">Define acceptance criteria</span>
+        </div>
+      </div>
+      <div class="tools-row">
+        <div class="section-label">Tools / Integrations</div>
+        <div class="tag-list">
+          <span class="tag">Jira API</span>
+          <span class="tag">GitHub Issues</span>
+          <span class="tag">Confluence</span>
+          <span class="tag">LLM (spec→tasks)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-wrap">
+    <div class="arrow-line"></div>
+    <div class="arrow-head"></div>
+    <div class="arrow-label">task plan + design doc</div>
+  </div>
+
+  <!-- AGENT 2 -->
+  <div class="agent-block a2">
+    <div class="agent-header">
+      <div class="agent-icon">👨‍💻</div>
+      <div class="agent-meta">
+        <div class="agent-number">Agent 2</div>
+        <div class="agent-name">Code Builder Agent</div>
+      </div>
+    </div>
+    <div class="agent-body">
+      <div>
+        <div class="section-label">Responsibilities</div>
+        <div class="tag-list">
+          <span class="tag">Generate code</span>
+          <span class="tag">Write unit tests</span>
+          <span class="tag">Code review (self)</span>
+          <span class="tag">Open PR to staging branch</span>
+          <span class="tag">Run linter / formatter</span>
+        </div>
+      </div>
+      <div class="tools-row">
+        <div class="section-label">Tools / Integrations</div>
+        <div class="tag-list">
+          <span class="tag">GitHub API</span>
+          <span class="tag">Claude Code</span>
+          <span class="tag">ESLint / Prettier</span>
+          <span class="tag">Jest / Pytest</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-wrap">
+    <div class="arrow-line"></div>
+    <div class="arrow-head"></div>
+    <div class="arrow-label">PR merged → trigger CI/CD</div>
+  </div>
+
+  <!-- AGENT 3 -->
+  <div class="agent-block a3">
+    <div class="agent-header">
+      <div class="agent-icon">🧪</div>
+      <div class="agent-meta">
+        <div class="agent-number">Agent 3</div>
+        <div class="agent-name">QA & Deploy Agent</div>
+      </div>
+    </div>
+    <div class="agent-body">
+      <div>
+        <div class="section-label">Responsibilities</div>
+        <div class="tag-list">
+          <span class="tag">Deploy to staging</span>
+          <span class="tag">Run integration tests</span>
+          <span class="tag">Run E2E tests</span>
+          <span class="tag">Validate acceptance criteria</span>
+          <span class="tag">Approve → deploy to prod</span>
+          <span class="tag">Rollback on failure</span>
+        </div>
+      </div>
+      <div class="tools-row">
+        <div class="section-label">Tools / Integrations</div>
+        <div class="tag-list">
+          <span class="tag">GitHub Actions</span>
+          <span class="tag">Playwright / Cypress</span>
+          <span class="tag">AWS / GCP / Vercel</span>
+          <span class="tag">Kubernetes</span>
+          <span class="tag">ArgoCD</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-wrap">
+    <div class="arrow-line"></div>
+    <div class="arrow-head"></div>
+    <div class="arrow-label">deployed to production</div>
+  </div>
+
+  <!-- AGENT 4 -->
+  <div class="agent-block a4">
+    <div class="agent-header">
+      <div class="agent-icon">🔍</div>
+      <div class="agent-meta">
+        <div class="agent-number">Agent 4</div>
+        <div class="agent-name">Observability & Self-Heal Agent</div>
+      </div>
+    </div>
+    <div class="agent-body">
+      <div>
+        <div class="section-label">Responsibilities</div>
+        <div class="tag-list">
+          <span class="tag">Monitor Datadog logs</span>
+          <span class="tag">Detect anomalies / errors</span>
+          <span class="tag">Classify error type</span>
+          <span class="tag">Generate fix</span>
+          <span class="tag">Trigger hotfix pipeline</span>
+          <span class="tag">Rollback if unfixable</span>
+        </div>
+      </div>
+      <div class="tools-row">
+        <div class="section-label">Tools / Integrations</div>
+        <div class="tag-list">
+          <span class="tag">Datadog API</span>
+          <span class="tag">PagerDuty</span>
+          <span class="tag">LLM (error→fix)</span>
+          <span class="tag">GitHub API</span>
+          <span class="tag">Slack alerts</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Self-heal loop -->
+  <div class="arrow-wrap">
+    <div class="arrow-line"></div>
+    <div class="arrow-head"></div>
+    <div class="arrow-label">error detected → self-heal loop</div>
+  </div>
+
+  <div class="selfheal-box">
+    <div class="selfheal-icon">🔁</div>
+    <div class="selfheal-text">
+      <h3>Self-Heal Loop (Agent 4 → Agent 2 → Agent 3)</h3>
+      <p>Agent 4 reads error from Datadog → classifies root cause → passes fix request back to Agent 2 (code fix) → Agent 3 re-tests & deploys hotfix → Agent 4 confirms resolution. If not fixed after N attempts → rollback + page human.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- LEGEND / STACK -->
+<div style="max-width:900px; margin: 32px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+  <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 18px 20px;">
+    <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #8b949e; margin-bottom: 10px;">Orchestration Layer</div>
+    <div style="font-size: 0.85rem; line-height: 1.8; color: #e6edf3;">
+      🧩 LangGraph / CrewAI / AutoGen<br>
+      📨 Message bus between agents (Redis / SQS)<br>
+      🔐 Human approval gate (staging → prod)<br>
+      📊 Shared memory / vector store for context
+    </div>
+  </div>
+  <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 18px 20px;">
+    <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #8b949e; margin-bottom: 10px;">Safety & Control</div>
+    <div style="font-size: 0.85rem; line-height: 1.8; color: #e6edf3;">
+      🛑 Human-in-the-loop at prod deploy<br>
+      🔢 Max retry limit on self-heal (e.g. 3x)<br>
+      📝 Full audit log of all agent actions<br>
+      ↩️ Automatic rollback on critical failures
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
