@@ -211,6 +211,10 @@
     <button class="tab" onclick="showPanel('tradeoffs',this)">Trade-offs</button>
     <button class="tab" onclick="showPanel('scalability',this)">Scalability</button>
     <button class="tab" onclick="showPanel('deno',this)">🦕 Deno Notes</button>
+    <button class="tab" onclick="showPanel('tenancy',this)">🏢 Tenant Isolation</button>
+    <button class="tab" onclick="showPanel('observability-tab',this)">📡 Observability</button>
+    <button class="tab" onclick="showPanel('native-charts',this)">📈 Native Charts</button>
+    <button class="tab" onclick="showPanel('why-choices',this)">🧠 Why These Choices</button>
   </div>
 
   <!-- ══ ARCHITECTURE ══ -->
@@ -500,14 +504,39 @@
   <!-- ══ RLS ══ -->
   <div class="panel" id="panel-rls">
     <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px;line-height:1.6;">This is the most critical security flow. Power BI enforces row-level security based on identity claims we inject into the embed token. Here's the step-by-step flow every time a user loads a report:</p>
+
+    <div style="background:rgba(0,196,255,0.06);border:1px solid rgba(0,196,255,0.25);border-radius:10px;padding:16px 18px;margin-bottom:24px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);margin-bottom:8px;">Embedding Model: App Owns Data</div>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.6;">We use the <strong style="color:var(--text)">"App Owns Data"</strong> embedding model — not "User Owns Data." This is the correct choice for a multi-tenant SaaS: our application (via a service principal) owns the Power BI workspace and generates embed tokens on behalf of users. End users do NOT need Power BI licences. The service principal authenticates to Azure AD using client credentials (client ID + secret or certificate), gets an access token, then calls the Power BI REST API to generate a short-lived embed token with RLS identity injected.</div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);margin-bottom:8px;">Why NOT User Owns Data</div>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.6;">"User Owns Data" requires every user to have a Power BI Pro or Premium Per User licence (~$10–20/user/month) and sign in directly to Microsoft. For a white-label SaaS with external customers who shouldn't know or care about Power BI's existence, this is completely wrong. "App Owns Data" is the right model: our service principal is the only entity that needs Power BI permissions. Users just get a short-lived embed token that works anonymously from Power BI's perspective.</div>
+      </div>
+    </div>
     <div class="rls-flow">
       <div class="rls-step"><div class="rls-num" style="background:rgba(0,196,255,0.1);border:1px solid var(--accent);color:var(--accent)">1</div><div class="rls-step-content"><h4>User authenticates</h4><p>User logs in via Auth0/Azure AD B2C. A JWT is issued containing user ID, email, tenant ID, and roles. Stored in a secure httpOnly cookie.</p><code>{ sub, email, tenantId, roles[], orgId }</code></div></div>
       <div class="rls-step"><div class="rls-num" style="background:rgba(124,58,237,0.1);border:1px solid var(--accent2);color:var(--accent2)">2</div><div class="rls-step-content"><h4>Frontend requests embed token</h4><p>When a report page loads, the frontend calls our backend — passing the user's JWT in the cookie automatically.</p><code>POST /api/reports/:reportId/embed-token</code></div></div>
       <div class="rls-step"><div class="rls-num" style="background:rgba(245,158,11,0.1);border:1px solid var(--accent4);color:var(--accent4)">3</div><div class="rls-step-content"><h4>Backend validates + resolves context</h4><p>Embed Token Service (Deno) verifies the JWT, resolves tenant config, and determines which Power BI workspace and report this user can access.</p><code>tenantId → workspaceId + reportId + RLS role</code></div></div>
-      <div class="rls-step"><div class="rls-num" style="background:rgba(16,185,129,0.1);border:1px solid var(--accent3);color:var(--accent3)">4</div><div class="rls-step-content"><h4>Embed token generated with RLS claims</h4><p>We call the Power BI REST API using a service principal. We pass the user's identity and the RLS role. Power BI returns a short-lived embed token (1 hour).</p><code>GenerateTokenInGroup({ roles: [{ name, username }] })</code></div></div>
+      <div class="rls-step"><div class="rls-num" style="background:rgba(16,185,129,0.1);border:1px solid var(--accent3);color:var(--accent3)">4</div><div class="rls-step-content"><h4>Embed token generated with RLS claims</h4><p>We call the Power BI REST API using a service principal (App Owns Data model). We pass the user's identity and the RLS role. Power BI returns a short-lived embed token (1 hour).</p><code>GenerateTokenInGroup({ identities: [{ username, roles, datasets }] })</code></div></div>
       <div class="rls-step"><div class="rls-num" style="background:rgba(0,196,255,0.1);border:1px solid var(--accent);color:var(--accent)">5</div><div class="rls-step-content"><h4>Token cached in Redis</h4><p>The embed token is cached in Redis keyed by user + report + tenant for ~45 minutes to avoid hammering the Power BI API on every page load.</p><code>pbi:embed:{tenantId}:{userId}:{reportId} (TTL 45m)</code></div></div>
       <div class="rls-step"><div class="rls-num" style="background:rgba(244,114,182,0.1);border:1px solid #f472b6;color:#f472b6">6</div><div class="rls-step-content"><h4>Frontend embeds the report</h4><p>The embed token is returned to the frontend. The Power BI SDK renders the report. Power BI enforces RLS server-side — the user can only see rows matching their identity.</p><code>powerbi.embed(element, { type: 'report', accessToken })</code></div></div>
       <div class="rls-step"><div class="rls-num" style="background:rgba(245,158,11,0.1);border:1px solid var(--accent4);color:var(--accent4)">7</div><div class="rls-step-content"><h4>Silent token refresh</h4><p>The frontend tracks token expiry. Before it expires, it silently requests a new embed token. No page reload — the SDK supports hot token swap.</p></div></div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;">
+      <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.12em;color:var(--accent3);margin-bottom:14px;">Actual API Call — GenerateTokenInGroup</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;">Request body sent to Power BI REST API</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--bg);border:1px solid var(--border);padding:12px 14px;border-radius:6px;color:var(--accent3);line-height:1.8;">POST /v1.0/myorg/groups/{workspaceId}<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/reports/{reportId}/GenerateToken<br><br>{<br>&nbsp;&nbsp;<span style="color:var(--text-dim)">"accessLevel"</span>: <span style="color:var(--accent4)">"view"</span>,<br>&nbsp;&nbsp;<span style="color:var(--text-dim)">"identities"</span>: [<br>&nbsp;&nbsp;&nbsp;&nbsp;{<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text-dim)">"username"</span>: <span style="color:var(--accent4)">"tenant-acme-corp"</span>,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text-dim)">"roles"</span>: [<span style="color:var(--accent4)">"TenantViewer"</span>],<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text-dim)">"datasets"</span>: [<span style="color:var(--accent4)">"dataset-guid-here"</span>]<br>&nbsp;&nbsp;&nbsp;&nbsp;}<br>&nbsp;&nbsp;]<br>}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;">Corresponding DAX filter in Power BI dataset</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--bg);border:1px solid var(--border);padding:12px 14px;border-radius:6px;color:var(--accent3);line-height:1.8;"><span style="color:var(--text-muted)">-- RLS role: TenantViewer</span><br><span style="color:var(--text-muted)">-- DAX filter expression:</span><br>[TenantSlug] = USERPRINCIPALNAME()<br><br><span style="color:var(--text-muted)">-- username in embed token maps to</span><br><span style="color:var(--text-muted)">-- USERPRINCIPALNAME() in DAX.</span><br><span style="color:var(--text-muted)">-- We pass tenantId as the username.</span><br><span style="color:var(--text-muted)">-- Power BI filters rows accordingly.</span><br><br><span style="color:var(--text-dim)">-- For row-level user scoping:</span><br>[UserId] = <span style="color:var(--accent4)">"user-id-via-customData"</span></div>
+          <div style="margin-top:8px;padding:8px 10px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:5px;font-size:11px;color:var(--text-dim);line-height:1.5;"><strong style="color:var(--accent4)">customData</strong> claim: for more complex RLS (e.g. restricting by both tenant AND specific user rows), pass additional context via the <code style="font-family:'IBM Plex Mono',monospace;font-size:10px;">customData</code> field in the identity object. Available as <code style="font-family:'IBM Plex Mono',monospace;font-size:10px;">CUSTOMDATA()</code> in DAX filters.</div>
+        </div>
+      </div>
     </div>
     <div style="background:var(--surface);border:1px solid var(--accent4);border-radius:10px;padding:18px;">
       <div style="font-size:12px;font-weight:600;color:var(--accent4);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">⚠️ Key Security Principle</div>
@@ -661,6 +690,427 @@
           Some Deno APIs still require <span class="tech-badge" style="font-size:10px;padding:1px 6px">--unstable-kv</span>, <span class="tech-badge" style="font-size:10px;padding:1px 6px">--unstable-cron</span>, etc. We don't currently use any. Audit before adopting new Deno-native features — don't ship unstable APIs to production without verifying the Deno team's stability commitment for that API.
         </div>
       </div>
+    </div>
+  </div>
+
+
+  <!-- ══ TENANT ISOLATION ══ -->
+  <div class="panel" id="panel-tenancy">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px;line-height:1.6;">Multi-tenancy is the most consequential architectural decision in this system. It affects cost, security, compliance, operational complexity, and how Power BI workspaces are structured. Here are the three models and the recommended choice:</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:32px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;opacity:0.65;">
+        <div style="background:rgba(239,68,68,0.08);border-bottom:1px solid var(--border);padding:14px 18px;">
+          <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent5);margin-bottom:4px;">Option A — Not Recommended</div>
+          <div style="font-size:15px;font-weight:700;">Schema-per-Tenant</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Strongest isolation, worst ops</div>
+        </div>
+        <div style="padding:16px 18px;">
+          <div style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:12px;">Separate Postgres schema per tenant. Strongest isolation but requires schema migrations across N tenants on every deploy.</div>
+          <div class="pro-con">
+            <div class="pro"><div class="pro-title">Pros</div><ul><li>Hard data boundary</li><li>Easier compliance stories</li><li>Simple per-tenant backup</li></ul></div>
+            <div class="con"><div class="con-title">Cons</div><ul><li>Migrations run N× per deploy</li><li>Connection pool explosion</li><li>Expensive at 200 tenants</li><li>Can't query across tenants</li></ul></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface);border:2px solid var(--accent3);border-radius:12px;overflow:hidden;position:relative;">
+        <div style="position:absolute;top:12px;right:12px;background:var(--accent3);color:#000;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;font-family:'IBM Plex Mono',monospace;">RECOMMENDED</div>
+        <div style="background:rgba(16,185,129,0.08);border-bottom:1px solid var(--border);padding:14px 18px;">
+          <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent3);margin-bottom:4px;">Option B — Recommended</div>
+          <div style="font-size:15px;font-weight:700;">Shared DB + Postgres RLS</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Balanced — strong isolation, simple ops</div>
+        </div>
+        <div style="padding:16px 18px;">
+          <div style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:12px;">Single database, every table has a <code style="font-family:'IBM Plex Mono',monospace;font-size:10px;background:var(--surface2);border:1px solid var(--border);padding:1px 5px;border-radius:3px;color:var(--accent3)">tenant_id</code> column. Postgres Row-Level Security policies enforce isolation at the DB layer — even a buggy query can't leak cross-tenant data.</div>
+          <div class="pro-con">
+            <div class="pro"><div class="pro-title">Pros</div><ul><li>One migration per deploy</li><li>Low infra cost</li><li>Cross-tenant analytics possible</li><li>Defence in depth via DB RLS</li></ul></div>
+            <div class="con"><div class="con-title">Cons</div><ul><li>Requires discipline on every query</li><li>Noisy-neighbour risk without connection limits</li></ul></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;opacity:0.65;">
+        <div style="background:rgba(245,158,11,0.08);border-bottom:1px solid var(--border);padding:14px 18px;">
+          <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent4);margin-bottom:4px;">Option C — Future Option</div>
+          <div style="font-size:15px;font-weight:700;">DB-per-Tenant</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Max isolation, max cost</div>
+        </div>
+        <div style="padding:16px 18px;">
+          <div style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:12px;">Separate RDS instance per tenant. Makes sense only for very high-value enterprise clients with contractual data isolation requirements.</div>
+          <div class="pro-con">
+            <div class="pro"><div class="pro-title">Pros</div><ul><li>Hard contractual boundary</li><li>Per-tenant encryption keys</li><li>Independent scaling</li></ul></div>
+            <div class="con"><div class="con-title">Cons</div><ul><li>~$50+/mo per tenant just for DB</li><li>200 tenants = complex fleet mgmt</li><li>Cannot be retrofitted easily</li></ul></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:24px;">
+      <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.12em;color:var(--accent3);margin-bottom:16px;">How Shared DB + Postgres RLS Works in Practice</div>
+      <div class="rls-flow">
+        <div class="rls-step">
+          <div class="rls-num" style="background:rgba(16,185,129,0.1);border:1px solid var(--accent3);color:var(--accent3)">1</div>
+          <div class="rls-step-content">
+            <h4>Every table has tenant_id</h4>
+            <p>Schema convention: every application table includes a non-nullable <code>tenant_id UUID REFERENCES tenants(id)</code>. Enforced by Drizzle ORM schema definitions at code level.</p>
+          </div>
+        </div>
+        <div class="rls-step">
+          <div class="rls-num" style="background:rgba(16,185,129,0.1);border:1px solid var(--accent3);color:var(--accent3)">2</div>
+          <div class="rls-step-content">
+            <h4>Postgres RLS policy on every table</h4>
+            <p>At the DB layer, an RLS policy filters all reads and writes. Even a raw SQL query bypassing the ORM can't see another tenant's data.</p>
+            <code>CREATE POLICY tenant_isolation ON reports USING (tenant_id = current_setting('app.tenant_id')::uuid);</code>
+          </div>
+        </div>
+        <div class="rls-step">
+          <div class="rls-num" style="background:rgba(16,185,129,0.1);border:1px solid var(--accent3);color:var(--accent3)">3</div>
+          <div class="rls-step-content">
+            <h4>API middleware sets tenant context per request</h4>
+            <p>On every request, the middleware extracts tenantId from the verified JWT and sets it as a Postgres session variable before any query runs.</p>
+            <code>SET LOCAL app.tenant_id = '${req.user.tenantId}';</code>
+          </div>
+        </div>
+        <div class="rls-step">
+          <div class="rls-num" style="background:rgba(16,185,129,0.1);border:1px solid var(--accent3);color:var(--accent3)">4</div>
+          <div class="rls-step-content">
+            <h4>Admin bypass for internal operations</h4>
+            <p>A separate <code>app_admin</code> DB role with RLS bypassed is used only for migrations and internal tooling. Application services use a <code>app_user</code> role with RLS enabled — no exceptions.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;">
+      <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.12em;color:var(--accent);margin-bottom:16px;">Power BI Tenant Isolation — Workspace Strategy</div>
+      <p style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:16px;">The Power BI workspace structure is a separate but equally important decision. There are two main approaches:</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;border-top:2px solid var(--accent2);">
+          <div style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:8px;">Option: One workspace per tenant</div>
+          <div style="font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:10px;">Each tenant gets its own Power BI workspace. Reports and datasets are isolated by workspace boundary — no RLS needed for tenant separation (though RLS still used for row-level user permissions within a tenant).</div>
+          <div style="font-size:11px;"><span style="color:var(--accent3)">✓</span> Hardest isolation boundary possible<br><span style="color:var(--accent3)">✓</span> Clean workspace management per tenant<br><span style="color:var(--accent5)">✗</span> Workspace provisioning automation needed<br><span style="color:var(--accent5)">✗</span> Report updates must be pushed to each workspace</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--accent3);border-radius:8px;padding:16px;border-top:2px solid var(--accent3);position:relative;">
+          <div style="position:absolute;top:10px;right:10px;background:var(--accent3);color:#000;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;font-family:'IBM Plex Mono',monospace;">RECOMMENDED</div>
+          <div style="font-size:12px;font-weight:700;color:var(--accent3);margin-bottom:8px;">Option: Shared workspace + RLS</div>
+          <div style="font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:10px;">A small number of shared workspaces (one per report "type"). Tenant isolation is enforced entirely through the RLS identity we inject in the embed token. Simpler to manage and update reports.</div>
+          <div style="font-size:11px;"><span style="color:var(--accent3)">✓</span> Fewer workspaces to manage<br><span style="color:var(--accent3)">✓</span> Report updates deploy once<br><span style="color:var(--accent3)">✓</span> Works well with our embed token service<br><span style="color:var(--accent5)">✗</span> Relies entirely on RLS correctness for isolation</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;padding:12px 16px;background:rgba(0,196,255,0.06);border:1px solid rgba(0,196,255,0.2);border-radius:8px;font-size:12px;color:var(--text-dim);line-height:1.6;">
+        <strong style="color:var(--accent)">Our approach:</strong> Start with shared workspaces + RLS (simpler, faster to ship). Build workspace-per-tenant provisioning as an automation layer for any enterprise customers who contractually require hard workspace isolation. The Tenant Service handles the mapping — the embed service doesn't need to change, just the config it reads.
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ OBSERVABILITY ══ -->
+  <div class="panel" id="panel-observability-tab">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px;line-height:1.6;">The brief specifically calls out "clear observability, usage metrics, and monitoring" as a goal — and rightly so. This is a meaningful differentiator from Reporting Hub, which provides no visibility. Observability must be wired in from day one, not retrofitted.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+      <div class="scale-card" style="border-top:2px solid var(--accent);">
+        <div class="scale-header"><div class="scale-dot" style="background:var(--accent)"></div>Infrastructure Observability</div>
+        <div class="scale-item">
+          <div class="scale-item-title">Structured logging — tenantId on every line</div>
+          <div class="scale-item-desc">Every log emitted by every service includes <code style="font-family:'IBM Plex Mono',monospace;font-size:10px;background:var(--surface2);border:1px solid var(--border);padding:1px 5px;border-radius:3px;color:var(--accent3)">{ tenantId, userId, requestId, service, level, timestamp }</code>. This makes it possible to filter all logs for a specific tenant when debugging an issue, without needing to re-deploy or add instrumentation. Pino logger on the backend; forwarded to CloudWatch Logs + DataDog.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Distributed tracing</div>
+          <div class="scale-item-desc">OpenTelemetry traces span browser → API → DB → Power BI REST API. When a user reports "the report was slow," we can see exactly where the latency was: embed token generation, Redis miss, PBI rendering, or network. DataDog APM or Grafana Tempo as the trace backend.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Alerting thresholds</div>
+          <div class="scale-item-desc">CloudWatch alarms page on-call when: API error rate &gt;1% for 5 minutes, embed token latency p99 &gt;2s, Power BI capacity &gt;80% utilisation, or auth failure rate spikes (potential credential stuffing).</div>
+        </div>
+      </div>
+
+      <div class="scale-card" style="border-top:2px solid var(--accent3);">
+        <div class="scale-header"><div class="scale-dot" style="background:var(--accent3)"></div>Application-Level Usage Metrics</div>
+        <div class="scale-item">
+          <div class="scale-item-title">Report usage analytics</div>
+          <div class="scale-item-desc">Every report view, filter interaction, and export is logged as an event: <code style="font-family:'IBM Plex Mono',monospace;font-size:10px;background:var(--surface2);border:1px solid var(--border);padding:1px 5px;border-radius:3px;color:var(--accent3)">{ event: "report.viewed", tenantId, reportId, userId, durationMs }</code>. This lets us answer: Which reports are most used? Which tenants are most active? Which reports have high load times?</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Per-tenant usage dashboard</div>
+          <div class="scale-item-desc">An internal admin view shows tenant health at a glance: MAU, DAU, report views, last login timestamps, feature flag states. Useful for customer success, renewals, and identifying at-risk tenants (low engagement = churn risk).</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Power BI capacity monitoring</div>
+          <div class="scale-item-desc">The PBI REST API exposes capacity metrics. We poll and graph: CPU utilisation %, memory %, concurrent render count. This is the primary early warning for "we need to upgrade from A1 to A2" before users start experiencing timeouts.</div>
+        </div>
+      </div>
+
+      <div class="scale-card" style="border-top:2px solid var(--accent2);">
+        <div class="scale-header"><div class="scale-dot" style="background:var(--accent2)"></div>Security Monitoring</div>
+        <div class="scale-item">
+          <div class="scale-item-title">Audit log — all mutations recorded</div>
+          <div class="scale-item-desc">Every write operation (user creation, role change, tenant config update, report mapping change) is written to an append-only <code style="font-family:'IBM Plex Mono',monospace;font-size:10px;background:var(--surface2);border:1px solid var(--border);padding:1px 5px;border-radius:3px;color:var(--accent3)">audit_log</code> table with actor, action, before/after values, and IP. Non-deletable. Queryable by tenant admins via the admin UI.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Auth failure detection</div>
+          <div class="scale-item-desc">Auth0 provides built-in anomaly detection. We additionally track failed embed token requests (could indicate a stolen JWT being replayed) and alert when any tenant sees an unusual spike in auth failures.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Embed token abuse detection</div>
+          <div class="scale-item-desc">Track embed token generation rate per user. A user generating hundreds of tokens rapidly is anomalous — could indicate an automated scraping attempt. Redis rate limiters block this before it reaches the Power BI API.</div>
+        </div>
+      </div>
+
+      <div class="scale-card" style="border-top:2px solid var(--accent4);">
+        <div class="scale-header"><div class="scale-dot" style="background:var(--accent4)"></div>Key Metrics to Track from Day 1</div>
+        <div style="display:grid;gap:8px;">
+          <div style="background:var(--surface2);border-radius:6px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;">
+            <div style="font-size:18px;">⚡</div>
+            <div><div style="font-size:12px;font-weight:600;">Embed token latency</div><div style="font-size:11px;color:var(--text-muted);">Target: p50 &lt;200ms, p99 &lt;800ms. Cache hits should be &lt;5ms. PBI API cold calls ~500ms.</div></div>
+          </div>
+          <div style="background:var(--surface2);border-radius:6px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;">
+            <div style="font-size:18px;">📊</div>
+            <div><div style="font-size:12px;font-weight:600;">Report time-to-interactive</div><div style="font-size:11px;color:var(--text-muted);">Total time from user clicking a report page to PBI fully rendered. Target: &lt;3s. Drives A-SKU sizing decisions.</div></div>
+          </div>
+          <div style="background:var(--surface2);border-radius:6px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;">
+            <div style="font-size:18px;">🏢</div>
+            <div><div style="font-size:12px;font-weight:600;">Tenant config cache hit rate</div><div style="font-size:11px;color:var(--text-muted);">Should be &gt;95%. A drop signals Redis is evicting tenant configs — scale Redis or tune TTL.</div></div>
+          </div>
+          <div style="background:var(--surface2);border-radius:6px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;">
+            <div style="font-size:18px;">🔋</div>
+            <div><div style="font-size:12px;font-weight:600;">PBI capacity utilisation %</div><div style="font-size:11px;color:var(--text-muted);">Alert at 70%, escalate at 85%. Gives time to upgrade SKU before users see failures.</div></div>
+          </div>
+          <div style="background:var(--surface2);border-radius:6px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;">
+            <div style="font-size:18px;">👥</div>
+            <div><div style="font-size:12px;font-weight:600;">MAU / DAU per tenant</div><div style="font-size:11px;color:var(--text-muted);">Business health signal. Low engagement = churn risk. High growth = proactive capacity planning.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid rgba(0,196,255,0.3);border-radius:10px;padding:18px;">
+      <div style="font-size:12px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Tooling Recommendation</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:12px;color:var(--text-dim);line-height:1.6;">
+        <div><strong style="color:var(--text)">DataDog</strong> — Preferred option if budget allows. Combines APM, logs, metrics, dashboards, and alerts in one platform. Native ECS and Fargate integrations. Higher cost but significantly reduces operational overhead at scale.</div>
+        <div><strong style="color:var(--text)">OpenTelemetry + Grafana</strong> — Lower cost alternative. OTel for instrumentation (vendor-neutral), Grafana for dashboards, Loki for logs, Tempo for traces. More setup time, but no vendor lock-in and essentially free at our scale.</div>
+        <div><strong style="color:var(--text)">CloudWatch as baseline</strong> — Use regardless of the above. Container Insights for ECS metrics, Log Groups for all service logs, Alarms for critical thresholds. Zero additional cost beyond storage. Pair with one of the above for richer dashboards.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ NATIVE CHARTS ══ -->
+  <div class="panel" id="panel-native-charts">
+    <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:22px;">💡</div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--accent4);margin-bottom:3px;">Optional — High-Value Long-Term Decision</div>
+        <div style="font-size:13px;color:var(--text-dim);">Power BI Embedded A-SKU is a <strong style="color:var(--text)">flat monthly cost regardless of usage</strong>. At scale, migrating high-volume or simple reports to native charts eliminates that cost entirely. This isn't an urgent decision, but identifying candidates early saves significant money later.</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+      <div class="scale-card" style="border-top:2px solid var(--accent4);">
+        <div class="scale-header"><div class="scale-dot" style="background:var(--accent4)"></div>Why Consider It</div>
+        <div class="scale-item">
+          <div class="scale-item-title">The cost math</div>
+          <div class="scale-item-desc">At A2 SKU (~$1,470/mo) with 200 tenants, that's ~$7.35/tenant/month just for rendering capacity — before any compute, DB, or auth costs. For tenants that only ever view 2–3 simple bar charts, this is expensive. Native charts for simple reports pay for themselves within months of dev effort.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Design control</div>
+          <div class="scale-item-desc">Power BI's visual style is constrained and corporate. Native charts let us match the platform's design system exactly — custom colours, typography, animations, and interactions that feel native to the product rather than embedded.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Interactivity and AI integration</div>
+          <div class="scale-item-desc">Native charts can respond to real-time data, AI-generated annotations, drilldowns that open application flows (e.g. clicking a revenue bar to open a CRUD form), and cross-chart state. These interactions are impossible or extremely limited in embedded Power BI.</div>
+        </div>
+      </div>
+
+      <div class="scale-card" style="border-top:2px solid var(--accent5);">
+        <div class="scale-header"><div class="scale-dot" style="background:var(--accent5)"></div>Why Not Rush It</div>
+        <div class="scale-item">
+          <div class="scale-item-title">Power BI reports are complex</div>
+          <div class="scale-item-desc">Power BI reports often have complex DAX measures, calculated columns, relationships, and interactivity built up over years. Rebuilding them natively requires understanding each report deeply — not just its visuals. A poor native port is worse than the original.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Stakeholder familiarity</div>
+          <div class="scale-item-desc">Report authors and power users are used to Power BI's interaction model. Changing the chart library changes their mental model. Any migration needs to be validated against user acceptance criteria, not just technical correctness.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Data access changes</div>
+          <div class="scale-item-desc">Native charts query data directly from the backend API. This requires exposing the datasets Power BI currently reads via secure API endpoints — a non-trivial backend change that needs careful design to preserve RLS guarantees.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px;">
+      <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.12em;color:var(--accent3);margin-bottom:16px;">Where to Start — The Migration Framework</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+        <div style="background:var(--surface2);border-radius:8px;padding:14px;border-top:2px solid var(--accent);">
+          <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;">STEP 1</div>
+          <div style="font-size:12px;font-weight:600;margin-bottom:4px;">Audit & Classify</div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">Inventory all Power BI reports. Classify by complexity (simple/medium/complex) and usage volume. Identify the "quick win" candidates.</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:14px;border-top:2px solid var(--accent2);">
+          <div style="font-size:11px;font-weight:700;color:var(--accent2);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;">STEP 2</div>
+          <div style="font-size:12px;font-weight:600;margin-bottom:4px;">Choose Library</div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">Evaluate Recharts (simple, React-native), Nivo (beautiful, opinionated), or ECharts (feature-rich, complex). Run a spike with one real report from each candidate type.</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:14px;border-top:2px solid var(--accent3);">
+          <div style="font-size:11px;font-weight:700;color:var(--accent3);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;">STEP 3</div>
+          <div style="font-size:12px;font-weight:600;margin-bottom:4px;">Pilot One Report</div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">Build a native version of the highest-volume simple report alongside the PBI version. A/B test internally. Validate data parity, RLS correctness, and performance.</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:14px;border-top:2px solid var(--accent4);">
+          <div style="font-size:11px;font-weight:700;color:var(--accent4);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;">STEP 4</div>
+          <div style="font-size:12px;font-weight:600;margin-bottom:4px;">Migrate in Waves</div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">Roll out by report type. Track cost savings as each report migrates. Set a threshold: "when native covers 60% of report views, evaluate dropping a PBI SKU tier."</div>
+        </div>
+      </div>
+
+      <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;">Library Comparison</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="text-align:left;padding:8px 12px;color:var(--text-muted);font-weight:600;font-family:'IBM Plex Mono',monospace;font-size:10px;">Library</th>
+              <th style="text-align:left;padding:8px 12px;color:var(--text-muted);font-weight:600;font-family:'IBM Plex Mono',monospace;font-size:10px;">Best For</th>
+              <th style="text-align:left;padding:8px 12px;color:var(--text-muted);font-weight:600;font-family:'IBM Plex Mono',monospace;font-size:10px;">Complexity</th>
+              <th style="text-align:left;padding:8px 12px;color:var(--text-muted);font-weight:600;font-family:'IBM Plex Mono',monospace;font-size:10px;">React Support</th>
+              <th style="text-align:left;padding:8px 12px;color:var(--text-muted);font-weight:600;font-family:'IBM Plex Mono',monospace;font-size:10px;">Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px 12px;font-weight:600;color:var(--accent3)">Recharts</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Bar, line, area, pie — standard business charts</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Low</td>
+              <td style="padding:10px 12px;color:var(--accent3)">Native React ✓</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Start here. Covers 70% of typical dashboard charts with minimal effort.</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px 12px;font-weight:600;color:var(--accent)">Nivo</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Heatmaps, treemaps, sankey, network charts</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Medium</td>
+              <td style="padding:10px 12px;color:var(--accent3)">React ✓</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Beautiful defaults. Use for complex or unusual chart types where Recharts falls short.</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px 12px;font-weight:600;color:var(--accent4)">ECharts</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Large datasets, geo maps, financial charts</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">High</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Via wrapper</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Reserve for high-data-volume or geo reports. Most powerful, but heaviest to integrate.</td>
+            </tr>
+            <tr>
+              <td style="padding:10px 12px;font-weight:600;color:var(--accent2)">D3</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Custom / bespoke visualisations</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Very High</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Manual integration</td>
+              <td style="padding:10px 12px;color:var(--text-dim)">Only if a report type can't be done in Recharts/Nivo. Avoid as primary library.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:16px 18px;">
+      <div style="font-size:12px;font-weight:600;color:var(--accent3);margin-bottom:8px;">Recommended starting point for this project</div>
+      <div style="font-size:13px;color:var(--text-dim);line-height:1.6;">Start with <strong style="color:var(--text)">Recharts</strong> for the first native chart pilot. It's React-native, has excellent TypeScript types, and covers standard business chart types that are likely the easiest PBI reports to migrate. Run the pilot on a high-volume, low-complexity report (e.g. a monthly KPI summary with bar + line charts). If the pilot proves the pattern, expand. Don't make the final library decision until you've run that spike — the data shapes and interactivity requirements of real reports will clarify which library fits best.</div>
+    </div>
+  </div>
+
+  <!-- ══ WHY THESE CHOICES ══ -->
+  <div class="panel" id="panel-why-choices">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px;line-height:1.6;">Architecture is about decisions, not just components. Here's the explicit reasoning behind each significant technology choice — and what was rejected and why.</p>
+
+    <div style="display:grid;gap:14px;">
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:220px 1fr 1fr;border-bottom:1px solid var(--border);">
+          <div style="padding:14px 18px;background:rgba(0,196,255,0.04);border-right:1px solid var(--border);">
+            <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);margin-bottom:4px;">Frontend</div>
+            <div style="font-size:15px;font-weight:700;">Next.js + React</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Chosen ✓</div>
+          </div>
+          <div style="padding:14px 18px;border-right:1px solid var(--border);">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent3);margin-bottom:6px;">Why Next.js</div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.6;">SSR gives fast first-load for report pages — critical for perceived performance. App Router supports nested tenant-specific layouts cleanly. Server Actions allow secure server-side operations (like auth checks) without a separate API hop. The Power BI embed SDK integrates as a Client Component while the shell is server-rendered. Single deployable unit keeps early-stage ops simple.</div>
+          </div>
+          <div style="padding:14px 18px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent5);margin-bottom:6px;">What was considered and rejected</div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.6;"><strong style="color:var(--text)">Remix:</strong> Strong SSR story but smaller ecosystem and less Power BI SDK documentation. <strong style="color:var(--text)">SvelteKit:</strong> Lighter weight but team retraining cost and fewer UI component libraries. <strong style="color:var(--text)">Vite SPA:</strong> No SSR — PBI embed pages would show blank content until JS hydrates, which is a bad experience on first load.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:220px 1fr 1fr;border-bottom:1px solid var(--border);">
+          <div style="padding:14px 18px;background:rgba(124,58,237,0.04);border-right:1px solid var(--border);">
+            <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent2);margin-bottom:4px;">Identity</div>
+            <div style="font-size:15px;font-weight:700;">Auth0</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Chosen ✓ (or Azure AD B2C)</div>
+          </div>
+          <div style="padding:14px 18px;border-right:1px solid var(--border);">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent3);margin-bottom:6px;">Why a managed IdP</div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.6;">Building authentication correctly — MFA, PKCE, refresh token rotation, enterprise SAML/OIDC connectors, brute-force protection — takes months and is a permanent maintenance liability. Auth0 gives all of this on day one. For a multi-tenant SaaS where enterprise customers will want SSO with their own identity provider (Azure AD, Okta, Google Workspace), a managed IdP with enterprise connections is almost mandatory. Auth0's free tier (7,500 MAU) covers the launch phase at zero cost.</div>
+          </div>
+          <div style="padding:14px 18px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent5);margin-bottom:6px;">Auth0 vs Azure AD B2C</div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.6;"><strong style="color:var(--text)">Choose Auth0</strong> if the team has no existing Microsoft dependency and wants the best DX for custom login flows and social connections. <strong style="color:var(--text)">Choose Azure AD B2C</strong> if the team is already in Azure (consolidating billing, using Azure DevOps, etc.) — its 50,000 MAU free tier is much larger, and keeping everything in the Microsoft ecosystem simplifies the Power BI service principal relationship. Either is a defensible choice; the decision should follow where the team's Azure relationship already is.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:220px 1fr 1fr;border-bottom:1px solid var(--border);">
+          <div style="padding:14px 18px;background:rgba(16,185,129,0.04);border-right:1px solid var(--border);">
+            <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent3);margin-bottom:4px;">Backend Runtime</div>
+            <div style="font-size:15px;font-weight:700;">Deno 2</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Chosen ✓ for API services</div>
+          </div>
+          <div style="padding:14px 18px;border-right:1px solid var(--border);">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent3);margin-bottom:6px;">Why Deno for backend services</div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.6;">The Embed Token Service handles Azure AD credentials and Power BI API calls — the most security-sensitive code in the system. Deno's deny-by-default permission model means the service physically cannot touch the filesystem or make unintended network calls unless explicitly permitted. Native TypeScript eliminates the tsconfig + ts-node build chain for all backend services. The Deno 2 npm compatibility layer means we're not giving up the npm ecosystem — Fastify, Drizzle, Zod, ioredis all work.</div>
+          </div>
+          <div style="padding:14px 18px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent5);margin-bottom:6px;">Why not Node.js everywhere</div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.6;">Node.js is the safe default and perfectly valid. The reason to consider Deno specifically for the Embed Token Service is the security model — a Node.js process with a compromised dependency can exfiltrate files, environment variables, and make arbitrary network calls. Deno's permission flags are a meaningful security control for a credential-handling process. The tradeoff: smaller hiring pool and occasional npm compatibility issues. For teams with strong Node.js experience and no appetite for runtime experimentation, using Node.js everywhere is a completely reasonable alternative.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:220px 1fr 1fr;border-bottom:1px solid var(--border);">
+          <div style="padding:14px 18px;background:rgba(245,158,11,0.04);border-right:1px solid var(--border);">
+            <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent4);margin-bottom:4px;">Compute</div>
+            <div style="font-size:15px;font-weight:700;">ECS Fargate</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Chosen ✓</div>
+          </div>
+          <div style="padding:14px 18px;border-right:1px solid var(--border);">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent3);margin-bottom:6px;">Why Fargate</div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.6;">The platform needs to run long-lived HTTP servers (Next.js SSR, Fastify API) — not short invocations. Fargate runs Docker containers without managing EC2 instances: no patching, no cluster management, no capacity reservations on the compute layer. ECS task definitions map cleanly to the per-service Docker images. Auto-scaling policies respond to CPU and memory, right-sizing for bursty traffic patterns. Deployments are blue-green with automatic rollback on health check failure.</div>
+          </div>
+          <div style="padding:14px 18px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent5);margin-bottom:6px;">What was considered and rejected</div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.6;"><strong style="color:var(--text)">Lambda:</strong> Cold starts are problematic for SSR and embed token generation (users notice 2–3s delays). Good for async jobs (report exports, dataset refresh triggers) but not request-response paths. <strong style="color:var(--text)">Kubernetes (EKS):</strong> Operationally heavier than needed at this scale. Fargate's simplicity is the right tradeoff until the team needs Kubernetes-specific features (custom scheduling, service meshes, etc.). <strong style="color:var(--text)">EC2:</strong> More control, more management burden. Fargate is the right abstraction level.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:220px 1fr 1fr;">
+          <div style="padding:14px 18px;background:rgba(244,114,182,0.04);border-right:1px solid var(--border);">
+            <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:#f472b6;margin-bottom:4px;">Database</div>
+            <div style="font-size:15px;font-weight:700;">PostgreSQL</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Chosen ✓</div>
+          </div>
+          <div style="padding:14px 18px;border-right:1px solid var(--border);">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent3);margin-bottom:6px;">Why PostgreSQL</div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.6;">The application data — tenants, users, roles, navigation trees, audit logs — is relational. Postgres is the right tool. Critically, Postgres Row-Level Security gives us a database-layer enforcement of tenant isolation that acts as a safety net below the application layer. JSONB support covers the flexible, schema-light parts of tenant config (navigation trees, feature flags) without needing a separate document store. RDS Multi-AZ handles failover automatically.</div>
+          </div>
+          <div style="padding:14px 18px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent5);margin-bottom:6px;">What was considered and rejected</div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.6;"><strong style="color:var(--text)">MongoDB/DynamoDB:</strong> NoSQL is attractive for tenant config (flexible schema) but loses Postgres RLS — meaning tenant isolation is enforced only at application layer. For a multi-tenant SaaS handling sensitive customer data, losing a DB-layer isolation guarantee is a meaningful security regression. <strong style="color:var(--text)">PlanetScale/Neon:</strong> Interesting serverless Postgres options but add complexity for a team that already knows RDS. Start with RDS, explore alternatives later if connection pooling or branching become compelling.</div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
