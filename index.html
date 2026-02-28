@@ -210,6 +210,7 @@
     <button class="tab" onclick="showPanel('rls',this)">Power BI RLS</button>
     <button class="tab" onclick="showPanel('tradeoffs',this)">Trade-offs</button>
     <button class="tab" onclick="showPanel('scalability',this)">Scalability</button>
+    <button class="tab" onclick="showPanel('deno',this)">🦕 Deno Notes</button>
   </div>
 
   <!-- ══ ARCHITECTURE ══ -->
@@ -267,8 +268,6 @@
     <p style="color:var(--text-dim);font-size:14px;margin-bottom:20px;line-height:1.6;">How the logical architecture maps to real AWS cloud resources, with Power BI hosted on Azure and Auth0 as an external SaaS. Designed for high availability with multi-AZ deployments on all stateful components.</p>
     <div class="infra-canvas">
       <div class="infra-title">Infrastructure Diagram — AWS ap-southeast-2 + External Services</div>
-
-      <!-- Users -->
       <div class="cloud-zone users-zone">
         <div class="zone-label users-zone">Users & Clients</div>
         <div class="infra-row">
@@ -277,16 +276,12 @@
           <div class="inode"><div class="inode-icon">🌐</div><div class="inode-name">Browser / Mobile</div><div class="inode-detail">HTTPS only · No installed client required</div></div>
         </div>
       </div>
-
       <div class="connector-row">
         <div class="connector"><div class="connector-line blue"></div><span>HTTPS / TLS 1.3</span></div>
         <div class="connector"><div class="connector-line blue"></div><span>CloudFront Edge</span></div>
       </div>
-
-      <!-- AWS Zone -->
       <div class="cloud-zone aws">
         <div class="zone-label aws">☁ AWS — ap-southeast-2 (Sydney)</div>
-
         <div class="infra-section-label">Edge & Security</div>
         <div class="infra-row" style="margin-bottom:18px;">
           <div class="inode"><div class="inode-icon">🌐</div><div class="inode-name">CloudFront CDN</div><div class="inode-detail">Global PoPs · Static assets · Cache headers · HTTPS enforcement</div><div><span class="inode-badge managed">Managed</span></div></div>
@@ -294,27 +289,25 @@
           <div class="inode"><div class="inode-icon">⚖️</div><div class="inode-name">Application Load Balancer</div><div class="inode-detail">Multi-AZ · SSL termination · Health checks · Path-based routing</div><div><span class="inode-badge ha">Multi-AZ</span></div></div>
           <div class="inode"><div class="inode-icon">🌐</div><div class="inode-name">Route 53</div><div class="inode-detail">DNS routing · Health-check failover · Per-tenant subdomains (*.app.com)</div><div><span class="inode-badge managed">Managed</span></div></div>
         </div>
-
         <div class="infra-section-label">Compute — ECS Fargate (Multi-AZ, Auto-Scaling)</div>
         <div class="az-container" style="margin-bottom:18px;">
           <div class="az-zone">
             <div class="az-label">Availability Zone A</div>
             <div class="az-items">
-              <div class="az-item"><div class="az-item-icon">🐳</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Next.js App (2–10 tasks)</div><div style="font-size:10px;color:var(--text-muted)">0.5 vCPU / 1 GB · SSR + API routes</div></div></div>
-              <div class="az-item"><div class="az-item-icon">🐳</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Core API Service (2–8 tasks)</div><div style="font-size:10px;color:var(--text-muted)">0.5 vCPU / 1 GB · Fastify REST API</div></div></div>
-              <div class="az-item"><div class="az-item-icon">🔑</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Embed Token Service (2–4 tasks)</div><div style="font-size:10px;color:var(--text-muted)">0.25 vCPU / 512 MB · PBI token gen</div></div></div>
+              <div class="az-item"><div class="az-item-icon">🐳</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Next.js App (2–10 tasks)</div><div style="font-size:10px;color:var(--text-muted)">0.5 vCPU / 1 GB · SSR + API routes · Node.js 20</div></div></div>
+              <div class="az-item"><div class="az-item-icon">🦕</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Core API Service (2–8 tasks)</div><div style="font-size:10px;color:var(--text-muted)">0.5 vCPU / 1 GB · Fastify REST API · Deno 2</div></div></div>
+              <div class="az-item"><div class="az-item-icon">🦕</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Embed Token Service (2–4 tasks)</div><div style="font-size:10px;color:var(--text-muted)">0.25 vCPU / 512 MB · PBI token gen · Deno 2</div></div></div>
             </div>
           </div>
           <div class="az-zone">
             <div class="az-label">Availability Zone B</div>
             <div class="az-items">
               <div class="az-item"><div class="az-item-icon">🐳</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Next.js App (mirror)</div><div style="font-size:10px;color:var(--text-muted)">Auto-scaled replica of AZ-A</div></div></div>
-              <div class="az-item"><div class="az-item-icon">🐳</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Core API Service (mirror)</div><div style="font-size:10px;color:var(--text-muted)">Auto-scaled replica of AZ-A</div></div></div>
-              <div class="az-item"><div class="az-item-icon">🔑</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Embed Token Service (mirror)</div><div style="font-size:10px;color:var(--text-muted)">Auto-scaled replica of AZ-A</div></div></div>
+              <div class="az-item"><div class="az-item-icon">🦕</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Core API Service (mirror)</div><div style="font-size:10px;color:var(--text-muted)">Auto-scaled replica of AZ-A</div></div></div>
+              <div class="az-item"><div class="az-item-icon">🦕</div><div><div style="font-size:11px;font-weight:600;color:var(--text)">Embed Token Service (mirror)</div><div style="font-size:10px;color:var(--text-muted)">Auto-scaled replica of AZ-A</div></div></div>
             </div>
           </div>
         </div>
-
         <div class="infra-section-label">Data Layer</div>
         <div class="infra-row" style="margin-bottom:18px;">
           <div class="inode"><div class="inode-icon">🐘</div><div class="inode-name">RDS PostgreSQL</div><div class="inode-detail">db.t4g.medium · Multi-AZ standby · Read replica · Auto-backups 7d</div><div><span class="inode-badge ha">Multi-AZ</span></div></div>
@@ -322,7 +315,6 @@
           <div class="inode"><div class="inode-icon">🗄️</div><div class="inode-name">S3 Buckets</div><div class="inode-detail">Tenant assets · Report exports · Versioning · SSE-S3 encryption</div><div><span class="inode-badge managed">Managed</span></div></div>
           <div class="inode"><div class="inode-icon">🔒</div><div class="inode-name">Secrets Manager</div><div class="inode-detail">DB creds · PBI service principal · API keys · Auto-rotation enabled</div><div><span class="inode-badge managed">Managed</span></div></div>
         </div>
-
         <div class="infra-section-label">CI/CD & Observability</div>
         <div class="infra-row">
           <div class="inode"><div class="inode-icon">📦</div><div class="inode-name">ECR (Container Registry)</div><div class="inode-detail">Docker images · Vulnerability scanning · Immutable tags</div><div><span class="inode-badge managed">Managed</span></div></div>
@@ -330,14 +322,11 @@
           <div class="inode"><div class="inode-icon">📡</div><div class="inode-name">CloudWatch</div><div class="inode-detail">Container insights · Log groups · Custom metrics · Alarms → SNS</div><div><span class="inode-badge managed">Managed</span></div></div>
         </div>
       </div>
-
       <div class="connector-row">
         <div class="connector"><div class="connector-line purple"></div><span>OIDC login flow</span></div>
         <div class="connector"><div class="connector-line blue"></div><span>PBI REST API (HTTPS)</span></div>
         <div class="connector"><div class="connector-line green"></div><span>Email / AI APIs</span></div>
       </div>
-
-      <!-- External SaaS -->
       <div class="cloud-zone saas-ext">
         <div class="zone-label saas-ext">External SaaS / Managed Services</div>
         <div class="infra-row">
@@ -346,13 +335,10 @@
           <div class="inode"><div class="inode-icon">🤖</div><div class="inode-name">OpenAI / Anthropic</div><div class="inode-detail">AI features · NL-to-query · Report summaries · Insights (optional)</div><div><span class="inode-badge ext-badge">SaaS</span></div></div>
         </div>
       </div>
-
       <div class="connector-row">
         <div class="connector"><div class="connector-line blue"></div><span>Embed token → browser</span></div>
         <div class="connector"><div class="connector-line amber"></div><span>Azure AD service principal</span></div>
       </div>
-
-      <!-- Power BI Azure -->
       <div class="cloud-zone azure-ext">
         <div class="zone-label azure-ext">☁ Microsoft Azure — Power BI Service</div>
         <div class="infra-row">
@@ -361,14 +347,12 @@
           <div class="inode"><div class="inode-icon">🔑</div><div class="inode-name">Azure AD App Registration</div><div class="inode-detail">Service principal · Used by Embed Token Service only · Credentials in Secrets Manager</div><div><span class="inode-badge ext-badge">Azure AD</span></div></div>
         </div>
       </div>
-
-      <!-- Flow key -->
       <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
         <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Key Request Paths</div>
         <div style="display:flex;flex-direction:column;gap:8px;">
           <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent);border-radius:1px;flex-shrink:0;"></div>Page load: User → CloudFront → WAF → ALB → ECS Next.js (SSR) → RDS (tenant config)</div>
           <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent2);border-radius:1px;flex-shrink:0;"></div>Login: Browser → Auth0 (OIDC) → JWT in httpOnly cookie → all subsequent API calls</div>
-          <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent3);border-radius:1px;flex-shrink:0;"></div>Report load: Browser → Embed Svc → Redis (cache hit?) → PBI REST API → embed token → browser → Power BI renders</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent3);border-radius:1px;flex-shrink:0;"></div>Report load: Browser → Embed Svc (Deno) → Redis (cache hit?) → PBI REST API → embed token → browser → Power BI renders</div>
           <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim)"><div style="width:28px;height:2px;background:var(--accent4);border-radius:1px;flex-shrink:0;"></div>Secrets: ECS tasks pull from Secrets Manager at startup — never baked into images or env vars</div>
         </div>
       </div>
@@ -377,8 +361,6 @@
 
   <!-- ══ COST CALCULATOR ══ -->
   <div class="panel" id="panel-cost">
-
-    <!-- Context banner -->
     <div style="background:rgba(0,196,255,0.06);border:1px solid rgba(0,196,255,0.2);border-radius:10px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px;">
       <div style="font-size:20px;">📋</div>
       <div>
@@ -386,8 +368,6 @@
         <div style="font-size:13px;color:var(--text-dim);">10–50 tenants at launch → 50–200 at 12mo &nbsp;·&nbsp; 500–2,000 peak concurrent users &nbsp;·&nbsp; AWS or Azure hosting. Sliders pre-loaded to mid-range of your estimates.</div>
       </div>
     </div>
-
-    <!-- Cloud provider toggle at top level -->
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
       <div style="font-size:12px;font-weight:600;color:var(--text-dim);white-space:nowrap;">☁ Cloud Provider:</div>
       <div class="control-options">
@@ -399,8 +379,6 @@
         <button class="opt-btn" id="btn-compare" onclick="toggleCompare()" style="border-color:var(--accent3);color:var(--accent3);">⇄ Compare Both</button>
       </div>
     </div>
-
-    <!-- Side-by-side comparison (hidden by default) -->
     <div id="compare-panel" style="display:none;margin-bottom:24px;">
       <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.15em;margin-bottom:14px;">AWS vs Azure — Cost Comparison (based on current slider values)</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
@@ -415,7 +393,6 @@
       </div>
       <div style="margin-top:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-dim);line-height:1.6;" id="compare-verdict"></div>
     </div>
-
     <div class="cost-layout">
       <div class="cost-controls">
         <div class="cost-controls-title">⚙ Parameters</div>
@@ -472,11 +449,8 @@
             <button class="opt-btn" id="opt-ri" onclick="setRI(true)">Reserved (1yr ~35% off)</button>
           </div>
         </div>
-
-        <!-- Key insight box -->
         <div id="insight-box" style="margin-top:20px;padding:14px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--accent4);"></div>
       </div>
-
       <div>
         <div class="cost-summary">
           <div class="cost-stat">
@@ -495,13 +469,10 @@
             <div class="cost-stat-sub">6mo launch + 6mo scale</div>
           </div>
         </div>
-
-        <!-- PBI as % warning bar -->
         <div id="pbi-warning" style="margin-bottom:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:none;">
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;">Cost Breakdown by Category</div>
           <div id="cost-bar-chart"></div>
         </div>
-
         <div class="cost-breakdown">
           <div class="breakdown-header">
             <div>Service</div><div>Tier</div><div>Launch /mo</div><div>Scale /mo</div><div></div>
@@ -514,7 +485,6 @@
             <div></div>
           </div>
         </div>
-
         <div class="cost-notes">
           <div class="cost-notes-title">📌 Notes for your scale (500–2,000 concurrent users)</div>
           <div class="cost-note"><div class="cost-note-dot" style="background:var(--accent4)"></div><div class="cost-note-text"><strong style="color:var(--text)">Power BI A2 SKU is strongly recommended at your scale.</strong> 500–2,000 concurrent users means A1 (300 max) will be insufficient at peak. A2 at $1,470/mo handles up to ~600 concurrent renders. At 2,000 concurrent you'd need A3 ($2,941/mo). This is your biggest cost lever — plan for A2 at minimum.</div></div>
@@ -533,7 +503,7 @@
     <div class="rls-flow">
       <div class="rls-step"><div class="rls-num" style="background:rgba(0,196,255,0.1);border:1px solid var(--accent);color:var(--accent)">1</div><div class="rls-step-content"><h4>User authenticates</h4><p>User logs in via Auth0/Azure AD B2C. A JWT is issued containing user ID, email, tenant ID, and roles. Stored in a secure httpOnly cookie.</p><code>{ sub, email, tenantId, roles[], orgId }</code></div></div>
       <div class="rls-step"><div class="rls-num" style="background:rgba(124,58,237,0.1);border:1px solid var(--accent2);color:var(--accent2)">2</div><div class="rls-step-content"><h4>Frontend requests embed token</h4><p>When a report page loads, the frontend calls our backend — passing the user's JWT in the cookie automatically.</p><code>POST /api/reports/:reportId/embed-token</code></div></div>
-      <div class="rls-step"><div class="rls-num" style="background:rgba(245,158,11,0.1);border:1px solid var(--accent4);color:var(--accent4)">3</div><div class="rls-step-content"><h4>Backend validates + resolves context</h4><p>Embed Token Service verifies the JWT, resolves tenant config, and determines which Power BI workspace and report this user can access.</p><code>tenantId → workspaceId + reportId + RLS role</code></div></div>
+      <div class="rls-step"><div class="rls-num" style="background:rgba(245,158,11,0.1);border:1px solid var(--accent4);color:var(--accent4)">3</div><div class="rls-step-content"><h4>Backend validates + resolves context</h4><p>Embed Token Service (Deno) verifies the JWT, resolves tenant config, and determines which Power BI workspace and report this user can access.</p><code>tenantId → workspaceId + reportId + RLS role</code></div></div>
       <div class="rls-step"><div class="rls-num" style="background:rgba(16,185,129,0.1);border:1px solid var(--accent3);color:var(--accent3)">4</div><div class="rls-step-content"><h4>Embed token generated with RLS claims</h4><p>We call the Power BI REST API using a service principal. We pass the user's identity and the RLS role. Power BI returns a short-lived embed token (1 hour).</p><code>GenerateTokenInGroup({ roles: [{ name, username }] })</code></div></div>
       <div class="rls-step"><div class="rls-num" style="background:rgba(0,196,255,0.1);border:1px solid var(--accent);color:var(--accent)">5</div><div class="rls-step-content"><h4>Token cached in Redis</h4><p>The embed token is cached in Redis keyed by user + report + tenant for ~45 minutes to avoid hammering the Power BI API on every page load.</p><code>pbi:embed:{tenantId}:{userId}:{reportId} (TTL 45m)</code></div></div>
       <div class="rls-step"><div class="rls-num" style="background:rgba(244,114,182,0.1);border:1px solid #f472b6;color:#f472b6">6</div><div class="rls-step-content"><h4>Frontend embeds the report</h4><p>The embed token is returned to the frontend. The Power BI SDK renders the report. Power BI enforces RLS server-side — the user can only see rows matching their identity.</p><code>powerbi.embed(element, { type: 'report', accessToken })</code></div></div>
@@ -541,7 +511,7 @@
     </div>
     <div style="background:var(--surface);border:1px solid var(--accent4);border-radius:10px;padding:18px;">
       <div style="font-size:12px;font-weight:600;color:var(--accent4);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">⚠️ Key Security Principle</div>
-      <p style="font-size:13px;color:var(--text-dim);line-height:1.6;">Power BI service principal credentials and workspace IDs <strong style="color:var(--text)">never reach the browser</strong>. All Power BI REST API calls happen server-side. The frontend only receives short-lived embed tokens. Tenants are isolated at both the application layer (our DB) and the Power BI layer (RLS roles).</p>
+      <p style="font-size:13px;color:var(--text-dim);line-height:1.6;">Power BI service principal credentials and workspace IDs <strong style="color:var(--text)">never reach the browser</strong>. All Power BI REST API calls happen server-side in the Deno Embed Token Service. The frontend only receives short-lived embed tokens. Tenants are isolated at both the application layer (our DB) and the Power BI layer (RLS roles).</p>
     </div>
   </div>
 
@@ -553,6 +523,7 @@
       <div class="tradeoff-card"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(124,58,237,0.1)">🔐</div><div><div class="tradeoff-title">Auth0 vs Roll-Your-Own Auth</div><div class="tradeoff-subtitle">Cost vs control</div></div></div><div class="tradeoff-body">Auth0 gives us battle-tested MFA, SSO, and enterprise identity connectors without building from scratch.</div><div class="pro-con"><div class="pro"><div class="pro-title">Auth0 Pros</div><ul><li>MFA/SSO out of box</li><li>Enterprise connectors</li><li>Faster to market</li></ul></div><div class="con"><div class="con-title">Cons</div><ul><li>Monthly cost at scale</li><li>External dependency</li><li>Less flow flexibility</li></ul></div></div></div>
       <div class="tradeoff-card"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(16,185,129,0.1)">📊</div><div><div class="tradeoff-title">Keep Power BI vs Native Charts</div><div class="tradeoff-subtitle">Speed to market vs long-term cost</div></div></div><div class="tradeoff-body">Power BI is powerful and familiar but adds A-SKU cost and creates Microsoft dependency. Native charts give full control.</div><div class="pro-con"><div class="pro"><div class="pro-title">Keep PBI</div><ul><li>No rebuild effort</li><li>Rich built-in features</li><li>Stakeholders know it</li></ul></div><div class="con"><div class="con-title">Go Native</div><ul><li>Eliminate A-SKU cost</li><li>Full design control</li><li>Significant dev effort</li></ul></div></div></div>
       <div class="tradeoff-card"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(245,158,11,0.1)">🗄️</div><div><div class="tradeoff-title">Shared DB vs Isolated schemas</div><div class="tradeoff-subtitle">Cost vs isolation strength</div></div></div><div class="tradeoff-body">Shared database with tenantId column + Postgres RLS is simpler and cheaper. Schema-per-tenant offers stronger isolation but painful migrations.</div><div class="pro-con"><div class="pro"><div class="pro-title">Shared DB</div><ul><li>Lower cost</li><li>Simple migrations</li><li>Easier to operate</li></ul></div><div class="con"><div class="con-title">Isolated schemas</div><ul><li>Stronger isolation</li><li>Better compliance story</li><li>Complex migrations</li></ul></div></div></div>
+      <div class="tradeoff-card"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(16,185,129,0.1)">🦕</div><div><div class="tradeoff-title">Deno (backend) vs Node.js everywhere</div><div class="tradeoff-subtitle">Developer experience vs ecosystem breadth</div></div></div><div class="tradeoff-body">Deno 2 for backend services gives native TypeScript, built-in security, and a lean toolchain. Node.js remains for Next.js (Deno not yet compatible).</div><div class="pro-con"><div class="pro"><div class="pro-title">Deno Pros</div><ul><li>No tsconfig / ts-node</li><li>Deny-by-default security</li><li>Built-in fmt/lint/test</li></ul></div><div class="con"><div class="con-title">Cons</div><ul><li>Some npm packages incompatible</li><li>Mixed runtimes in monorepo</li><li>Smaller hiring pool</li></ul></div></div></div>
       <div class="tradeoff-card" style="grid-column:1/-1;"><div class="tradeoff-header"><div class="tradeoff-icon" style="background:rgba(0,196,255,0.1)">🪜</div><div><div class="tradeoff-title">Migration: Big Bang vs Incremental</div><div class="tradeoff-subtitle">Risk vs speed</div></div></div><div class="tradeoff-body" style="margin-bottom:12px;">Run both systems in parallel briefly, migrate tenants in waves starting with internal users, use feature flags to toggle per tenant.</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;"><div style="background:var(--surface2);border-radius:6px;padding:11px;border-top:2px solid var(--accent)"><div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:3px;">Phase 1</div><div style="font-size:11px;color:var(--text-muted)">Build new platform · Internal users only</div></div><div style="background:var(--surface2);border-radius:6px;padding:11px;border-top:2px solid var(--accent2)"><div style="font-size:11px;font-weight:700;color:var(--accent2);margin-bottom:3px;">Phase 2</div><div style="font-size:11px;color:var(--text-muted)">Pilot external tenants · Feature flag toggle</div></div><div style="background:var(--surface2);border-radius:6px;padding:11px;border-top:2px solid var(--accent3)"><div style="font-size:11px;font-weight:700;color:var(--accent3);margin-bottom:3px;">Phase 3</div><div style="font-size:11px;color:var(--text-muted)">Wave migration of remaining tenants</div></div><div style="background:var(--surface2);border-radius:6px;padding:11px;border-top:2px solid var(--accent4)"><div style="font-size:11px;font-weight:700;color:var(--accent4);margin-bottom:3px;">Phase 4</div><div style="font-size:11px;color:var(--text-muted)">Decommission Reporting Hub</div></div></div></div>
     </div>
   </div>
@@ -565,6 +536,131 @@
       <div class="scale-card" style="border-top:2px solid var(--accent3)"><div class="scale-header"><div class="scale-dot" style="background:var(--accent3)"></div>Multi-tenant Data Isolation</div><div class="scale-item"><div class="scale-item-title">The problem</div><div class="scale-item-desc">As tenant count grows, a poorly designed tenancy model creates noisy-neighbour problems, security risk, and painful migrations.</div></div><div class="scale-item"><div class="scale-item-title">Shared DB + Postgres RLS</div><div class="scale-item-desc">Single Postgres DB with tenantId on all tables. RLS policies enforce isolation at the DB layer — even if application code has a bug.</div></div><div class="scale-item"><div class="scale-item-title">Connection pooling</div><div class="scale-item-desc">PgBouncer in transaction mode. At scale, naive connection-per-request kills Postgres. Pool and reuse aggressively.</div></div></div>
       <div class="scale-card" style="border-top:2px solid var(--accent4)"><div class="scale-header"><div class="scale-dot" style="background:var(--accent4)"></div>Auth at Scale</div><div class="scale-item"><div class="scale-item-title">Token validation</div><div class="scale-item-desc">JWT RS256 verify is ~0.1ms. Cache Auth0 JWKS public keys locally. Don't call Auth0 on every request — only on key rotation.</div></div><div class="scale-item"><div class="scale-item-title">Per-tenant rate limiting</div><div class="scale-item-desc">Redis-backed sliding window rate limits per tenant and per endpoint. Prevents one tenant degrading others.</div></div></div>
       <div class="scale-card" style="border-top:2px solid var(--accent2)"><div class="scale-header"><div class="scale-dot" style="background:var(--accent2)"></div>Observability from Day 1</div><div class="scale-item"><div class="scale-item-title">Why it matters early</div><div class="scale-item-desc">Retrofitting observability is painful. Wire up structured logging (tenantId, userId on every log line), traces, and business metrics from the start.</div></div><div class="scale-item"><div class="scale-item-title">Key metrics</div><div class="scale-item-desc">Embed token latency · Report load time per tenant · Auth failure rate · PBI capacity utilisation · API error rates.</div></div></div>
+    </div>
+  </div>
+
+  <!-- ══ DENO NOTES ══ -->
+  <div class="panel" id="panel-deno">
+    <div style="background:rgba(0,196,255,0.06);border:1px solid rgba(0,196,255,0.2);border-radius:10px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:22px;">🦕</div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:3px;">Deno Runtime — Project Notes</div>
+        <div style="font-size:13px;color:var(--text-dim);">This project uses <strong style="color:var(--text)">Deno 2</strong> as the JavaScript runtime for all backend services. Deno replaces Node.js+npm for the API tier — native TypeScript, deny-by-default security, and zero build config.</div>
+      </div>
+    </div>
+
+    <div class="scale-grid">
+
+      <div class="scale-card" style="border-top:2px solid var(--accent)">
+        <div class="scale-header"><div class="scale-dot" style="background:var(--accent)"></div>Why Deno for This Project</div>
+        <div class="scale-item">
+          <div class="scale-item-title">Native TypeScript — zero config</div>
+          <div class="scale-item-desc">Deno runs <span class="tech-badge green">.ts</span> files directly. No tsconfig.json, no ts-node, no compile step during development. All backend services (Core API, Embed Token Service, Tenant Service, AI Service) are pure TypeScript executed directly by Deno 2.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Secure by default — principle of least privilege</div>
+          <div class="scale-item-desc">Deno denies all I/O by default and requires explicit permission flags. The Embed Token Service runs with only <span class="tech-badge primary">--allow-net</span> and <span class="tech-badge primary">--allow-env</span> — it physically cannot touch the filesystem or spawn processes. This aligns perfectly with the security posture required for a PBI credential handler.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Built-in toolchain eliminates setup</div>
+          <div class="scale-item-desc">Deno ships <span class="tech-badge">deno fmt</span> (Prettier replacement), <span class="tech-badge">deno lint</span> (ESLint replacement), <span class="tech-badge">deno test</span> (Jest replacement), and <span class="tech-badge">deno compile</span> for single-binary builds. Removes 4 dev-dependencies from every backend service.</div>
+        </div>
+      </div>
+
+      <div class="scale-card" style="border-top:2px solid var(--accent3)">
+        <div class="scale-header"><div class="scale-dot" style="background:var(--accent3)"></div>npm Compatibility (Deno 2)</div>
+        <div class="scale-item">
+          <div class="scale-item-title">npm: specifiers work natively</div>
+          <div class="scale-item-desc">Deno 2 supports <span class="tech-badge green">npm:package-name</span> imports directly in source. Key packages in this project: <span class="tech-badge green">npm:fastify</span> · <span class="tech-badge green">npm:drizzle-orm</span> · <span class="tech-badge green">npm:ioredis</span> · <span class="tech-badge green">npm:zod</span>. No node_modules folder, no install step needed — Deno caches to DENO_DIR on first run.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">deno.json replaces package.json</div>
+          <div class="scale-item-desc">Each service has a <span class="tech-badge">deno.json</span> declaring the imports map, task scripts, and lint/fmt config. Version pinning via <span class="tech-badge">deno.lock</span> committed to git for reproducible CI builds.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">JSR for Deno-native packages</div>
+          <div class="scale-item-desc">Prefer <span class="tech-badge green">jsr:@std/</span> for standard library modules: HTTP helpers, assertions, structured logging, CSV/JSON parsing. Fall back to <span class="tech-badge">npm:</span> only when no JSR equivalent exists.</div>
+        </div>
+      </div>
+
+      <div class="scale-card" style="border-top:2px solid var(--accent2)">
+        <div class="scale-header"><div class="scale-dot" style="background:var(--accent2)"></div>Per-Service Permission Flags</div>
+        <div class="scale-item">
+          <div class="scale-item-title">Core API</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--bg);border:1px solid var(--border);padding:8px 10px;border-radius:5px;color:var(--accent3);margin-top:6px;line-height:1.8">deno run \<br>&nbsp;&nbsp;--allow-net \<br>&nbsp;&nbsp;--allow-env \<br>&nbsp;&nbsp;--allow-read=./config \<br>&nbsp;&nbsp;main.ts</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Embed Token Service</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--bg);border:1px solid var(--border);padding:8px 10px;border-radius:5px;color:var(--accent3);margin-top:6px;line-height:1.8">deno run \<br>&nbsp;&nbsp;--allow-net \<br>&nbsp;&nbsp;--allow-env \<br>&nbsp;&nbsp;main.ts<br><span style="color:var(--text-muted)"># No --allow-read: credentials via env only</span></div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Tenant + AI Services</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--bg);border:1px solid var(--border);padding:8px 10px;border-radius:5px;color:var(--accent3);margin-top:6px;line-height:1.8">deno run \<br>&nbsp;&nbsp;--allow-net \<br>&nbsp;&nbsp;--allow-env \<br>&nbsp;&nbsp;--allow-read=./static \<br>&nbsp;&nbsp;main.ts</div>
+        </div>
+      </div>
+
+      <div class="scale-card" style="border-top:2px solid var(--accent4)">
+        <div class="scale-header"><div class="scale-dot" style="background:var(--accent4)"></div>Deno in Docker / ECS Fargate</div>
+        <div class="scale-item">
+          <div class="scale-item-title">Optimized Dockerfile pattern</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--bg);border:1px solid var(--border);padding:8px 10px;border-radius:5px;color:var(--accent3);margin-top:6px;line-height:1.8">FROM denoland/deno:2-alpine<br>WORKDIR /app<br><span style="color:var(--text-muted)"># Cache deps first (better layer caching)</span><br>COPY deno.json deno.lock ./<br>RUN deno cache main.ts<br><span style="color:var(--text-muted)"># Source copied after deps are cached</span><br>COPY . .<br>CMD ["deno","run","--allow-net","--allow-env","main.ts"]</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Image size advantage</div>
+          <div class="scale-item-desc">Deno Alpine image: ~80 MB. Node.js Alpine: ~130 MB. Smaller images mean faster ECS task cold starts during autoscale events. No node_modules directory keeps the image lean even with many dependencies.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Health checks unchanged</div>
+          <div class="scale-item-desc">ECS health check config is identical to Node.js services — Deno's HTTP server listens on the same port and responds to the same ALB health check path. No task definition changes needed beyond swapping the base image.</div>
+        </div>
+      </div>
+
+      <div class="scale-card" style="border-top:2px solid #f472b6">
+        <div class="scale-header"><div class="scale-dot" style="background:#f472b6"></div>Next.js Frontend — Key Caveat</div>
+        <div class="scale-item">
+          <div class="scale-item-title">Next.js still runs on Node.js</div>
+          <div class="scale-item-desc">Next.js App Router is <strong>not yet compatible with Deno</strong> as a runtime host. The frontend service continues to use Node.js 20 LTS in its own ECS container. Only the four backend services switch to Deno 2.</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Recommended monorepo layout</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--bg);border:1px solid var(--border);padding:8px 10px;border-radius:5px;color:var(--accent3);margin-top:6px;line-height:1.9">/apps<br>&nbsp;&nbsp;/web&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← Next.js&nbsp;&nbsp;&nbsp;(Node.js 20)<br>&nbsp;&nbsp;/api&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← Fastify&nbsp;&nbsp;&nbsp;(Deno 2)<br>&nbsp;&nbsp;/embed-svc&nbsp;&nbsp;&nbsp;&nbsp;← PBI token (Deno 2)<br>&nbsp;&nbsp;/tenant-svc&nbsp;&nbsp;&nbsp;← Config&nbsp;&nbsp;&nbsp;&nbsp;(Deno 2)<br>&nbsp;&nbsp;/ai-svc&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← AI ops&nbsp;&nbsp;&nbsp;&nbsp;(Deno 2)<br>/packages<br>&nbsp;&nbsp;/types&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← Shared TS types (JSR)</div>
+        </div>
+        <div class="scale-item">
+          <div class="scale-item-title">Shared types across runtimes</div>
+          <div class="scale-item-desc">Publish shared TypeScript interfaces to <span class="tech-badge green">jsr:@sapiant/types</span>. Both Next.js (via npm compat layer) and Deno services import from the same JSR source — no type drift between frontend contracts and backend API shapes.</div>
+        </div>
+      </div>
+
+      <div class="scale-card" style="border-top:2px solid var(--accent)">
+        <div class="scale-header"><div class="scale-dot" style="background:var(--accent)"></div>deno.json — Full Reference</div>
+        <div class="scale-item">
+          <div class="scale-item-title">Example — Core API service</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--bg);border:1px solid var(--border);padding:8px 10px;border-radius:5px;color:var(--accent3);margin-top:6px;line-height:1.8">{<br>&nbsp;&nbsp;"tasks": {<br>&nbsp;&nbsp;&nbsp;&nbsp;"dev":&nbsp;&nbsp;&nbsp;"deno run --watch --allow-net --allow-env main.ts",<br>&nbsp;&nbsp;&nbsp;&nbsp;"start": "deno run --allow-net --allow-env main.ts",<br>&nbsp;&nbsp;&nbsp;&nbsp;"test":&nbsp;&nbsp;"deno test --allow-net --allow-env",<br>&nbsp;&nbsp;&nbsp;&nbsp;"check": "deno check main.ts",<br>&nbsp;&nbsp;&nbsp;&nbsp;"lint":&nbsp;&nbsp;"deno lint",<br>&nbsp;&nbsp;&nbsp;&nbsp;"fmt":&nbsp;&nbsp;&nbsp;"deno fmt --check"<br>&nbsp;&nbsp;},<br>&nbsp;&nbsp;"imports": {<br>&nbsp;&nbsp;&nbsp;&nbsp;"fastify":&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"npm:fastify@^4",<br>&nbsp;&nbsp;&nbsp;&nbsp;"zod":&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"npm:zod@^3",<br>&nbsp;&nbsp;&nbsp;&nbsp;"ioredis":&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"npm:ioredis@^5",<br>&nbsp;&nbsp;&nbsp;&nbsp;"@std/assert":&nbsp;&nbsp;&nbsp;"jsr:@std/assert@^1",<br>&nbsp;&nbsp;&nbsp;&nbsp;"@std/log":&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"jsr:@std/log@^0.224"<br>&nbsp;&nbsp;}<br>}</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="margin-top:20px;background:var(--surface);border:1px solid var(--accent4);border-radius:10px;padding:18px;">
+      <div style="font-size:12px;font-weight:600;color:var(--accent4);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;">⚠️ Known Gotchas to Address Early</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="font-size:13px;color:var(--text-dim);line-height:1.6;padding:12px;background:var(--surface2);border-radius:8px;border-left:2px solid var(--accent5)">
+          <strong style="color:var(--text)">Native addon packages</strong><br>
+          Use <span class="tech-badge green" style="font-size:10px;padding:1px 6px">npm:postgres</span> (pure-JS) instead of <span class="tech-badge" style="font-size:10px;padding:1px 6px">npm:pg</span> which has N-API native bindings that don't run under Deno. Same for bcrypt — prefer <span class="tech-badge green" style="font-size:10px;padding:1px 6px">jsr:@denosaurs/bcrypt</span>. Audit each npm package before adopting it.
+        </div>
+        <div style="font-size:13px;color:var(--text-dim);line-height:1.6;padding:12px;background:var(--surface2);border-radius:8px;border-left:2px solid var(--accent5)">
+          <strong style="color:var(--text)">AWS SDK v3 compatibility</strong><br>
+          Most <span class="tech-badge" style="font-size:10px;padding:1px 6px">@aws-sdk/client-*</span> packages work under Deno, but some sub-packages use Node.js built-ins. Add <span class="tech-badge primary" style="font-size:10px;padding:1px 6px">--allow-sys</span> if you hit permission errors. Test S3 and Secrets Manager clients explicitly before committing to the setup.
+        </div>
+        <div style="font-size:13px;color:var(--text-dim);line-height:1.6;padding:12px;background:var(--surface2);border-radius:8px;border-left:2px solid var(--accent4)">
+          <strong style="color:var(--text)">CI/CD module caching</strong><br>
+          Set <span class="tech-badge amber" style="font-size:10px;padding:1px 6px">DENO_DIR=/root/.deno-cache</span> and cache that path in CodeBuild / GitHub Actions. Without caching, every pipeline run re-downloads all modules — adds 30–60 s per service and unnecessary egress cost from npm/JSR registries.
+        </div>
+        <div style="font-size:13px;color:var(--text-dim);line-height:1.6;padding:12px;background:var(--surface2);border-radius:8px;border-left:2px solid var(--accent4)">
+          <strong style="color:var(--text)">Unstable API flags</strong><br>
+          Some Deno APIs still require <span class="tech-badge" style="font-size:10px;padding:1px 6px">--unstable-kv</span>, <span class="tech-badge" style="font-size:10px;padding:1px 6px">--unstable-cron</span>, etc. We don't currently use any. Audit before adopting new Deno-native features — don't ship unstable APIs to production without verifying the Deno team's stability commitment for that API.
+        </div>
+      </div>
     </div>
   </div>
 
@@ -593,10 +689,10 @@ const details={
   session:{tag:'Identity & Auth',title:'Session Management',desc:'Short-lived access tokens (15 min) and refresh tokens (7 days). Stored in httpOnly secure cookies — not localStorage — immune to XSS. Token rotation on every refresh.',points:['Access token: 15 min, RS256 signed JWT','Refresh token: 7 days, rotated on use','httpOnly, Secure, SameSite=Strict cookies','Silent refresh before expiry — no page reload needed'],tech:['httpOnly Cookies','JWT RS256','Refresh Token Rotation'],techColor:'purple'},
   gateway:{tag:'API Gateway',title:'API Gateway / BFF',desc:'Backend-For-Frontend layer between Next.js and backend services. Handles routing, rate limiting, and provides a clean surface for the frontend.',points:['Next.js API routes serve as the BFF — keeps it simple','Validates JWT on every request','Redis-backed per-tenant rate limits','Response shaping: transforms service responses into frontend shapes'],tech:['Next.js API Routes','JWT Validation','Redis Rate Limiting'],techColor:'amber'},
   middleware:{tag:'API Gateway',title:'Middleware Layer',desc:'Cross-cutting concerns on every request: tenant resolution, audit logging, security headers, CORS.',points:['Tenant resolution: extracts tenantId from JWT, validates active','Audit logging: every mutation logged with user, tenant, action, timestamp','Security headers via Helmet: HSTS, CSP, X-Frame-Options','CORS: whitelist per-tenant allowed origins'],tech:['Helmet.js','Next.js Middleware','Structured Logging'],techColor:'amber'},
-  api:{tag:'Backend Services',title:'Core API',desc:'Central business logic layer. Handles all CRUD operations, tenant config, navigation menus, and report metadata.',points:['Fastify — faster than Express, excellent TypeScript support','Handles: user management, tenant config, navigation trees, page → report mappings','All queries include tenantId filter enforced at ORM level','Zod input validation — rejects malformed requests before DB'],tech:['Node.js','Fastify','Drizzle ORM','Zod','TypeScript'],techColor:'green'},
-  'embed-service':{tag:'Backend Services',title:'Embed Token Service',desc:'Most security-critical service. Generates Power BI embed tokens server-side using a service principal, injecting the correct RLS identity. Credentials never leave the server.',points:['Authenticates to PBI REST API using Service Principal','Resolves user → tenant → workspace → report → RLS role','Calls GenerateTokenInGroup with user\'s username for RLS','Returns 1-hour embed token — nothing more','Caches in Redis: pbi:embed:{tenantId}:{userId}:{reportId} (45min TTL)'],tech:['Power BI REST API','Service Principal','Redis Cache','Azure AD'],techColor:'green'},
-  'tenant-service':{tag:'Backend Services',title:'Tenant Service',desc:'Manages all tenant-specific config: branding, navigation menus, feature flags, report-to-page mappings. Replaces the Reporting Hub admin UI.',points:['Tenant CRUD: create tenants, configure branding','Navigation tree management: define page hierarchy per tenant','Report mapping: link pages to Power BI report IDs','Feature flags: enable/disable features per tenant','Cached in Redis — no DB hit on every page load'],tech:['PostgreSQL','Redis','Admin API','Feature Flags'],techColor:'green'},
-  'ai-service':{tag:'Backend Services',title:'AI / Analytics Service',desc:'Optional but high-value. Enables natural language querying, AI-generated insights, and intelligent summaries. Where we differentiate most from Reporting Hub.',points:['NL to data query: translate questions to safe, read-only, tenant-scoped SQL','AI-generated report summaries in plain text','Anomaly detection: flag unusual patterns','OpenAI GPT-4o or Anthropic Claude via API'],tech:['OpenAI API','Anthropic API','LangChain','Structured outputs'],techColor:'green'},
+  api:{tag:'Backend Services',title:'Core API (Deno 2)',desc:'Central business logic layer running on Deno 2. Handles all CRUD operations, tenant config, navigation menus, and report metadata. Native TypeScript, no build step.',points:['Fastify — faster than Express, excellent TypeScript support','Deno 2 runtime — native TS, deny-by-default security','Handles: user management, tenant config, navigation trees, page → report mappings','All queries include tenantId filter enforced at ORM level','Zod input validation — rejects malformed requests before DB'],tech:['Deno 2','Fastify','Drizzle ORM','Zod','TypeScript'],techColor:'green'},
+  'embed-service':{tag:'Backend Services',title:'Embed Token Service (Deno 2)',desc:'Most security-critical service, running on Deno 2 with minimal permissions. Generates Power BI embed tokens server-side using a service principal, injecting the correct RLS identity. Credentials never leave the server.',points:['Deno 2 runtime — runs with only --allow-net and --allow-env flags','Authenticates to PBI REST API using Service Principal','Resolves user → tenant → workspace → report → RLS role','Calls GenerateTokenInGroup with user\'s username for RLS','Returns 1-hour embed token — nothing more','Caches in Redis: pbi:embed:{tenantId}:{userId}:{reportId} (45min TTL)'],tech:['Deno 2','Power BI REST API','Service Principal','Redis Cache','Azure AD'],techColor:'green'},
+  'tenant-service':{tag:'Backend Services',title:'Tenant Service (Deno 2)',desc:'Manages all tenant-specific config: branding, navigation menus, feature flags, report-to-page mappings. Replaces the Reporting Hub admin UI. Runs on Deno 2.',points:['Tenant CRUD: create tenants, configure branding','Navigation tree management: define page hierarchy per tenant','Report mapping: link pages to Power BI report IDs','Feature flags: enable/disable features per tenant','Cached in Redis — no DB hit on every page load'],tech:['Deno 2','PostgreSQL','Redis','Admin API','Feature Flags'],techColor:'green'},
+  'ai-service':{tag:'Backend Services',title:'AI / Analytics Service (Deno 2)',desc:'Optional but high-value. Enables natural language querying, AI-generated insights, and intelligent summaries. Runs on Deno 2. Where we differentiate most from Reporting Hub.',points:['NL to data query: translate questions to safe, read-only, tenant-scoped SQL','AI-generated report summaries in plain text','Anomaly detection: flag unusual patterns','OpenAI GPT-4o or Anthropic Claude via API'],tech:['Deno 2','OpenAI API','Anthropic API','LangChain','Structured outputs'],techColor:'green'},
   postgres:{tag:'Data Layer',title:'PostgreSQL',desc:'Primary operational database. All application state: tenants, users, roles, config, audit logs. Postgres RLS enforces tenant isolation at the DB layer.',points:['All tables include tenantId foreign key','Postgres RLS policies as a safety net below app layer','AWS RDS Multi-AZ for high availability','Read replica for analytics/audit queries','PgBouncer connection pooling (transaction mode)'],tech:['PostgreSQL 16','Postgres RLS','PgBouncer','Drizzle ORM'],techColor:'amber'},
   redis:{tag:'Data Layer',title:'Redis',desc:'In-memory cache and session store. Embed token caching alone eliminates most Power BI REST API calls, which are slow (200–500ms).',points:['Embed token cache: 45min TTL, keyed by user+report+tenant','Tenant config cache: nav trees, branding','Rate limit counters: sliding window per tenant/user/endpoint'],tech:['Redis 7','ioredis','AWS ElastiCache'],techColor:'amber'},
   blob:{tag:'Data Layer',title:'Blob Storage',desc:'Object storage for assets that don\'t belong in the relational DB: tenant logos, exported reports.',points:['Tenant logos served via CloudFront CDN','Report exports stored temporarily with pre-signed URLs','Versioning enabled, SSE-S3 encryption'],tech:['S3','CloudFront CDN','Pre-signed URLs'],techColor:'amber'},
@@ -648,11 +744,8 @@ function toggleCompare(){
 
 function fmt(n){return'$'+Math.round(n).toLocaleString();}
 
-// Build cost model for a given cloud + params
 function buildCosts(cloud, tenantsLaunch, tenantsScale, mau, concurrent, ri){
   const pbiL=pbiCosts[pbiSKU], pbiS=pbiCosts[pbiSKU];
-
-  // Auth - same regardless of cloud
   let authL,authS,authName;
   if(authProvider==='auth0'){
     authL=Math.max(0,(mau-7500)*0.0023);
@@ -663,18 +756,15 @@ function buildCosts(cloud, tenantsLaunch, tenantsScale, mau, concurrent, ri){
     authS=Math.max(0,(mau*2-50000)*0.00016);
     authName='Azure AD B2C';
   }
-
   const launchTaskCount=6, scaleTaskCount=Math.max(18,Math.ceil(concurrent/15)*3);
-
   let services;
   if(cloud==='aws'){
-    // AWS ap-southeast-2 pricing
-    const taskHr=(0.5*0.04856)+(1*0.00532); // Fargate vCPU + mem
+    const taskHr=(0.5*0.04856)+(1*0.00532);
     const fargateL=taskHr*launchTaskCount*730*ri;
     const fargateS=taskHr*scaleTaskCount*730*ri;
-    const rdsL=67*2*ri; // db.t4g.medium Multi-AZ
+    const rdsL=67*2*ri;
     const rdsS=(tenantsScale>100?134:67)*2*ri;
-    const redisL=13.9*2; // cache.t4g.micro × 2
+    const redisL=13.9*2;
     const redisS=13.9*(concurrent>800?4:3);
     const cfL=10, cfS=Math.round(10+mau*0.005);
     const albL=18, albS=Math.round(16+concurrent*0.055);
@@ -683,7 +773,7 @@ function buildCosts(cloud, tenantsLaunch, tenantsScale, mau, concurrent, ri){
       {icon:'🌐',name:'CloudFront CDN',desc:'Global edge caching',tier:'Managed',launch:cfL,scale:cfS},
       {icon:'🛡️',name:'AWS WAF',desc:'Web application firewall',tier:'Managed',launch:wafL,scale:wafS},
       {icon:'⚖️',name:'ALB (Load Balancer)',desc:'Multi-AZ · SSL termination',tier:'Multi-AZ',launch:albL,scale:albS},
-      {icon:'🐳',name:'ECS Fargate',desc:`${launchTaskCount} tasks → ${scaleTaskCount} tasks`,tier:'Auto-scale',launch:fargateL,scale:fargateS},
+      {icon:'🦕',name:'ECS Fargate (Deno)',desc:`${launchTaskCount} tasks → ${scaleTaskCount} tasks`,tier:'Auto-scale',launch:fargateL,scale:fargateS},
       {icon:'🐘',name:'RDS PostgreSQL',desc:'db.t4g.medium · Multi-AZ',tier:'Multi-AZ',launch:rdsL,scale:rdsS},
       {icon:'⚡',name:'ElastiCache Redis',desc:'cache.t4g.micro cluster',tier:'Clustered',launch:redisL,scale:redisS},
       {icon:'🗄️',name:'S3 + Storage',desc:'Assets · exports · backups',tier:'Managed',launch:5,scale:Math.round(5+tenantsScale*0.15)},
@@ -692,33 +782,23 @@ function buildCosts(cloud, tenantsLaunch, tenantsScale, mau, concurrent, ri){
       {icon:'🌐',name:'Route 53',desc:'DNS routing',tier:'Managed',launch:5,scale:5},
     ];
   } else {
-    // Azure australiaeast pricing
-    // App Service P2v3: ~$0.21/hr → ~$153/mo per instance, need 4–12 at this scale
     const appSvcHr=0.21*ri;
-    const appSvcL=appSvcHr*4*730; // 4 instances launch
+    const appSvcL=appSvcHr*4*730;
     const appSvcS=appSvcHr*Math.max(8,Math.ceil(concurrent/80))*730;
-    // Azure DB for PostgreSQL Flexible — General Purpose D2s v3: ~$0.19/hr → ~$139/mo
-    const pgL=139*2*ri; // zone redundant
+    const pgL=139*2*ri;
     const pgS=(tenantsScale>100?278:139)*2*ri;
-    // Azure Cache for Redis C2: ~$134/mo
     const redisAzL=134;
     const redisAzS=concurrent>800?268:134;
-    // Azure CDN (Front Door Standard): ~$35/mo base
     const cdnL=35, cdnS=Math.round(35+mau*0.006);
-    // Azure App Gateway WAF: ~$0.036/hr + $0.011/GB → ~$30/mo
     const agwL=30, agwS=Math.round(28+concurrent*0.04);
-    // Azure Monitor: ~$0.30/GB logs ingested
     const monL=20, monS=Math.round(20+tenantsScale*0.6);
-    // Azure Key Vault: ~$0.03/10k operations
     const kvL=6, kvS=10;
-    // Blob Storage: ~$0.02/GB
     const blobL=5, blobS=Math.round(5+tenantsScale*0.15);
-    // Azure DNS: $0.90/zone/mo
     const dnsL=5, dnsS=5;
     services=[
       {icon:'🌐',name:'Azure Front Door (CDN)',desc:'Global edge · WAF included',tier:'Managed',launch:cdnL,scale:cdnS},
       {icon:'⚖️',name:'App Gateway + WAF',desc:'Zone redundant · SSL',tier:'Zone-HA',launch:agwL,scale:agwS},
-      {icon:'🐳',name:'App Service (P2v3)',desc:`${4} instances → ${Math.max(8,Math.ceil(concurrent/80))} instances`,tier:'Auto-scale',launch:appSvcL,scale:appSvcS},
+      {icon:'🦕',name:'App Service (P2v3, Deno)',desc:`${4} instances → ${Math.max(8,Math.ceil(concurrent/80))} instances`,tier:'Auto-scale',launch:appSvcL,scale:appSvcS},
       {icon:'🐘',name:'Azure DB PostgreSQL',desc:'Flexible · Zone redundant',tier:'Zone-HA',launch:pgL,scale:pgS},
       {icon:'⚡',name:'Azure Cache for Redis',desc:'C2 standard cluster',tier:'Clustered',launch:redisAzL,scale:redisAzS},
       {icon:'🗄️',name:'Blob Storage',desc:'Assets · exports · backups',tier:'Managed',launch:blobL,scale:blobS},
@@ -727,12 +807,9 @@ function buildCosts(cloud, tenantsLaunch, tenantsScale, mau, concurrent, ri){
       {icon:'🌐',name:'Azure DNS',desc:'DNS zones routing',tier:'Managed',launch:dnsL,scale:dnsS},
     ];
   }
-
-  // Shared costs regardless of cloud
   services.push({icon:'📊',name:`Power BI Embedded (${pbiSKU})`,desc:pbiDesc[pbiSKU],tier:'Azure',launch:pbiL,scale:pbiS});
   services.push({icon:'🔐',name:authName,desc:`${mau.toLocaleString()} → ${(mau*2).toLocaleString()} MAU`,tier:'SaaS',launch:authL,scale:authS});
   if(aiEnabled){services.push({icon:'🤖',name:'AI API (OpenAI/Anthropic)',desc:`~${mau.toLocaleString()} users`,tier:'SaaS',launch:mau*0.025,scale:mau*0.06});}
-
   return services;
 }
 
@@ -741,30 +818,21 @@ function recalc(){
   const tenantsScale=parseInt(document.getElementById('sl-tenants-scale').value);
   const mau=parseInt(document.getElementById('sl-mau').value);
   const concurrent=parseInt(document.getElementById('sl-concurrent').value);
-
   document.getElementById('lbl-tenants-launch').textContent=tenantsLaunch;
   document.getElementById('lbl-tenants-scale').textContent=tenantsScale;
   document.getElementById('lbl-mau').textContent=mau.toLocaleString();
   document.getElementById('lbl-concurrent').textContent=concurrent;
-
   const ri=riEnabled?0.65:1.0;
-
-  // PBI SKU hint
-  const neededSKU=concurrent>1200?'A3':concurrent>600?'A2':concurrent>300?'A2':'A1';
   const skuWarnings={A1:'⚠️ A1 only handles ~300 concurrent — may be insufficient at your peak.',A2:'✓ A2 handles ~600 concurrent — good for mid-range peaks.',A3:'✓ A3 handles ~1,200 concurrent — good for your upper scale estimate.'};
   document.getElementById('pbi-sku-hint').textContent=skuWarnings[pbiSKU]||'';
-
-  // Auth note
   const authNote=authProvider==='auth0'
     ?`Auth0 free tier: 7,500 MAU. Your ${mau.toLocaleString()} MAU = ${mau<=7500?'within free tier ✓':'paid tier, ~'+fmt((mau-7500)*0.0023)+'/mo'}`
     :`Azure AD B2C: 50,000 MAU free. Your ${mau.toLocaleString()} MAU = ${mau<=50000?'within free tier ✓':'paid tier, ~'+fmt((mau-50000)*0.00016)+'/mo'}`;
   document.getElementById('auth-note').textContent=authNote;
-
   const services=buildCosts(cloudProvider,tenantsLaunch,tenantsScale,mau,concurrent,ri);
   const totalLaunch=services.reduce((s,r)=>s+r.launch,0);
   const totalScale=services.reduce((s,r)=>s+r.scale,0);
   const maxVal=Math.max(...services.map(r=>r.scale),1);
-
   document.getElementById('breakdown-rows').innerHTML=services.map(r=>`
     <div class="breakdown-row">
       <div class="br-service"><div class="br-icon">${r.icon}</div><div><div class="br-name">${r.name}</div><div class="br-desc">${r.desc}</div></div></div>
@@ -773,7 +841,6 @@ function recalc(){
       <div class="br-scale">${fmt(r.scale)}</div>
       <div><div class="br-bar-inner" style="width:${Math.round(r.scale/maxVal*100)}%;background:${r.name.includes('Power BI')?'var(--accent4)':r.tier==='SaaS'?'var(--accent2)':'var(--accent)'}"></div></div>
     </div>`).join('');
-
   document.getElementById('footer-launch').textContent=fmt(totalLaunch);
   document.getElementById('footer-scale').textContent=fmt(totalScale);
   document.getElementById('stat-launch').textContent=fmt(totalLaunch);
@@ -781,10 +848,8 @@ function recalc(){
   document.getElementById('stat-annual').textContent=fmt(totalLaunch*6+totalScale*6);
   document.getElementById('stat-launch-sub').textContent=`~${tenantsLaunch} tenants`;
   document.getElementById('stat-scale-sub').textContent=`~${tenantsScale} tenants`;
-
-  // Insight box
   const pbiPct=Math.round((pbiCosts[pbiSKU]/totalScale)*100);
-  const riSaving=riEnabled?0:Math.round(totalScale*0.12); // ~12% of total if RI applied
+  const riSaving=riEnabled?0:Math.round(totalScale*0.12);
   document.getElementById('insight-box').innerHTML=`
     <div style="font-size:11px;font-weight:600;color:var(--accent4);margin-bottom:6px;">💡 Key insight</div>
     <div style="font-size:11px;color:var(--text-dim);line-height:1.6;">
@@ -792,8 +857,6 @@ function recalc(){
       ${!riEnabled?`Switching to Reserved Instances would save ~${fmt(riSaving)}/mo on compute.`:'Reserved Instances applied — ~35% saving on compute.'}
       ${pbiSKU==='A1'&&concurrent>300?'<span style="color:var(--accent5)"> ⚠️ Consider upgrading to A2 — your concurrent load may exceed A1 capacity.</span>':''}
     </div>`;
-
-  // Cost bar chart
   const pbiVal=pbiCosts[pbiSKU];
   const computeVal=services.filter(s=>s.name.includes('Fargate')||s.name.includes('App Service')).reduce((a,s)=>a+s.scale,0);
   const dataVal=services.filter(s=>s.name.includes('PostgreSQL')||s.name.includes('Redis')).reduce((a,s)=>a+s.scale,0);
@@ -815,8 +878,6 @@ function recalc(){
       </div>
       <div style="width:55px;font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;">${fmt(c.val)} <span style="color:var(--text-muted);font-size:9px;">${Math.round(c.val/totalScale*100)}%</span></div>
     </div>`).join('');
-
-  // Comparison panel
   if(showingCompare){
     ['aws','azure'].forEach(cloud=>{
       const s=buildCosts(cloud,tenantsLaunch,tenantsScale,mau,concurrent,ri);
@@ -847,7 +908,6 @@ function recalc(){
   }
 }
 
-// Initialise with your specific parameters
 document.getElementById('cloud-note').textContent='ECS Fargate + ElastiCache + RDS PostgreSQL';
 recalc();
 </script>
